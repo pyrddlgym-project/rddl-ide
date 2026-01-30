@@ -114,10 +114,10 @@ class CodeEditor:
         else:
             my_font = 'Courier'
         text_area = CTkCodeViewer(
-            window, font=(my_font, 14), language=language, theme=theme, wrap='none')
+            window, font=(my_font, 16), language=language, theme=theme, wrap='none')
         self.text = text_area
         
-        ln = TextLineNumbers(window, text_area, width=50, font=(my_font, 14))
+        ln = TextLineNumbers(window, text_area, width=50, font=(my_font, 16))
         ln.pack(side='left', fill='both')
         text_area.pack(expand=True, fill='both')        
         CTkScrollbar(window, command=text_area.xview)

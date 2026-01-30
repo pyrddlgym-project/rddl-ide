@@ -1,15 +1,12 @@
 from pyRDDLGym_jax.core.planner import (
-     _parse_config_string, _load_config, 
-     JaxBackpropPlanner, JaxOfflineController
+    load_config_from_string, JaxBackpropPlanner, JaxOfflineController
 )     
 
 PARAMETERS = """
-    [Model]
-    logic='FuzzyLogic'
-    tnorm='ProductTNorm'
-    tnorm_kwargs={}
+    [Compiler]
+    method='DefaultJaxRDDLCompilerWithGrad'
     
-    [Optimizer]
+    [Planner]
     method='JaxDeepReactivePolicy'
     method_kwargs={'topology': [128, 64], 'activation': 'tanh'}
     optimizer='rmsprop'
@@ -17,7 +14,7 @@ PARAMETERS = """
     batch_size_train=32
     batch_size_test=32
     
-    [Training]
+    [Optimize]
     key=42
     epochs=30000
     train_seconds=60
@@ -25,8 +22,7 @@ PARAMETERS = """
 """
 
 def build_policy(env):
-    config, args = _parse_config_string(PARAMETERS)
-    planner_args, _, train_args = _load_config(config, args)
+    planner_args, _, train_args = load_config_from_string(PARAMETERS)
     planner = JaxBackpropPlanner(rddl=env.model, **planner_args)
     return JaxOfflineController(planner, **train_args)
 

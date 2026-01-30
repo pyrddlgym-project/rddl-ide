@@ -391,7 +391,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         
     # domain menu bars
     domain_menu_file = domain_menu.add_cascade("File")
-    domain_menu_file_drop = CustomDropdownMenu(widget=domain_menu_file)
+    domain_menu_file_drop = CustomDropdownMenu(widget=domain_menu_file, font=("Roboto", 14))
     domain_menu_file_drop.add_option(option='New Domain', command=create_domain)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(option='Load Domain from rddlrepository...', command=open_from_dialog)
@@ -405,14 +405,14 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     domain_menu_file_drop.add_option(option='Exit', command=exit_application)
     
     domain_menu_edit = domain_menu.add_cascade("Edit")
-    domain_menu_edit_drop = CustomDropdownMenu(widget=domain_menu_edit)
+    domain_menu_edit_drop = CustomDropdownMenu(widget=domain_menu_edit, font=("Roboto", 14))
     domain_menu_edit_drop.add_option(option='Copy', command=copy_domain_text)
     domain_menu_edit_drop.add_option(option='Cut', command=cut_domain_text)
     domain_menu_edit_drop.add_option(option='Paste', command=paste_domain_text)
     
     # instance menu bar
     inst_menu_file = inst_menu.add_cascade("File")
-    inst_menu_file_drop = CustomDropdownMenu(widget=inst_menu_file)
+    inst_menu_file_drop = CustomDropdownMenu(widget=inst_menu_file, font=("Roboto", 14))
     inst_menu_file_drop.add_option(option='New Instance', command=create_instance)
     inst_menu_file_drop.add_separator()
     inst_menu_file_drop.add_option(option='Load Instance from File...', command=open_instance)
@@ -424,20 +424,20 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     
     # instance edit menu
     inst_menu_edit = inst_menu.add_cascade("Edit")
-    inst_menu_edit_drop = CustomDropdownMenu(widget=inst_menu_edit)
+    inst_menu_edit_drop = CustomDropdownMenu(widget=inst_menu_edit, font=("Roboto", 14))
     inst_menu_edit_drop.add_option(option='Copy', command=copy_instance_text)
     inst_menu_edit_drop.add_option(option='Cut', command=cut_instance_text)
     inst_menu_edit_drop.add_option(option='Paste', command=paste_instance_text)
     
     # policy file menu
     policy_file_menu = policy_menu.add_cascade("File")
-    policy_file_menu_drop = CustomDropdownMenu(widget=policy_file_menu)
+    policy_file_menu_drop = CustomDropdownMenu(widget=policy_file_menu, font=("Roboto", 14))
     policy_file_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
     policy_file_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
     
     # policy load menu
     policy_load_menu = policy_menu.add_cascade("Baseline")
-    policy_load_menu_drop = CustomDropdownMenu(widget=policy_load_menu)
+    policy_load_menu_drop = CustomDropdownMenu(widget=policy_load_menu, font=("Roboto", 14))
     policy_load_menu_drop.add_option(option='No-Op', command=load_noop)
     policy_load_menu_drop.add_option(option='Random', command=load_random)
     policy_load_menu_drop.add_separator()
@@ -451,7 +451,6 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     
     # policy run menu
     policy_run_menu = policy_menu.add_cascade("Run")
-    policy_run_menu_drop = CustomDropdownMenu(widget=policy_run_menu)
+    policy_run_menu_drop = CustomDropdownMenu(widget=policy_run_menu, font=("Roboto", 14))
     policy_run_menu_drop.add_option(option='Evaluate', command=evaluate)
     policy_run_menu_drop.add_option(option='Record', command=record)
-    
