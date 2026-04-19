@@ -1,25 +1,28 @@
+import os
 from customtkinter import CTk, CTkToplevel, set_appearance_mode, set_default_color_theme
 from CTkMenuBar import CTkMenuBar
 
 from rddl_ide.core.codearea import CodeEditor
 from rddl_ide.core.menubar import assign_menubar_functions
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
 
 class ToplevelWindow(CTkToplevel):
 
     def __init__(self, *args, **kwargs):
         super(ToplevelWindow, self).__init__(*args, **kwargs)
-        self.after(250, lambda: self.iconbitmap('icon.ico'))
+        self.after(250, lambda: self.iconbitmap(os.path.join(_HERE, 'icon.ico')))
         
         
 def main():
     set_appearance_mode("system")
-    set_default_color_theme("theme.json")
+    set_default_color_theme(os.path.join(_HERE, "theme.json"))
     
     # domain window
     domain_window = CTk()
     domain_window.title('[Domain] Untitled')
-    domain_window.wm_iconbitmap('icon.ico')
+    domain_window.wm_iconbitmap(os.path.join(_HERE, 'icon.ico'))
     w, h = domain_window._max_width, domain_window._max_height
     w = domain_window.winfo_screenwidth()
     h = domain_window.winfo_screenheight()

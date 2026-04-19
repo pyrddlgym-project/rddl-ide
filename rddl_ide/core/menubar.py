@@ -114,7 +114,8 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     
         def __init__(self, *args, **kwargs):
             super(ToplevelWindow, self).__init__(*args, **kwargs)
-            self.after(250, lambda: self.iconbitmap('icon.ico'))
+            abs_path = os.path.dirname(os.path.abspath(__file__))
+            self.after(250, lambda: self.iconbitmap(os.path.join(abs_path, 'icon.ico')))
         
     def open_from_dialog():
         global domain_file, inst_file, viz
