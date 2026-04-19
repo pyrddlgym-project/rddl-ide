@@ -3,9 +3,8 @@ from pyRDDLGym_jax.core.planner import (
 )
      
 PARAMETERS = """
-    [Compiler]
-    method='DefaultJaxRDDLCompilerWithGrad'
-    
+    [Compiler] 
+
     [Planner]
     method='JaxStraightLinePlan'
     method_kwargs={}
@@ -18,11 +17,10 @@ PARAMETERS = """
     key=42
     epochs=30000
     train_seconds=60    
-    policy_hyperparams=2.0
 """
 
 def build_policy(env):
-    planner_args, _, train_args = load_config_from_string(PARAMETERS)
+    planner_args, _, train_args = load_config_from_string(PARAMETERS)    
     planner = JaxBackpropPlanner(rddl=env.model, **planner_args)
     return JaxOfflineController(planner, **train_args)
 
