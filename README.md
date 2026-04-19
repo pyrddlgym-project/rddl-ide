@@ -19,16 +19,14 @@ This directory provides an IDE:
 
 ## Installation
 
-To install, you will need ``pyRDDLGym>=2.0`` from [here](https://github.com/pyrddlgym-project/pyRDDLGym) 
-and``tk`` (tkinter). To run the various baselines, you will also need the 
+To install, you will need ``pyRDDLGym>=2.0`` from [here](https://github.com/pyrddlgym-project/pyRDDLGym), and for the GUI to work you also need ``pygments``, ``customtkinter`` and ``CtkMenuBar``. To run the various baselines, you will also need the 
 [prerequisite packages](https://github.com/pyrddlgym-project). 
 
-To install directly with pip into the current directory with all of its requirements:
+To install directly with pip with all the preprequisites:
 
 ```shell
-pip install git+https://github.com/pyrddlgym-project/RDDL-IDE .
+pip install git+https://github.com/pyrddlgym-project/rdd-ide
 ```
-
 ## Running the IDE
 
 To launch the IDE, simply type:

@@ -16,8 +16,9 @@ PARAMETERS = """
     
     [Optimize]
     key=42
-    epochs=1000
+    epochs=5000
     train_seconds=2
+    policy_hyperparams=2.0
 """
 
 def build_policy(env):

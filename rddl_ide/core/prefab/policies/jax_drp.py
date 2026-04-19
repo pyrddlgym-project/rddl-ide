@@ -7,9 +7,9 @@ PARAMETERS = """
 
     [Planner]
     method='JaxDeepReactivePolicy'
-    method_kwargs={'topology': [128, 128]}
+    method_kwargs={'topology': [128, 64], 'activation': 'tanh'}
     optimizer='rmsprop'
-    optimizer_kwargs={'learning_rate': 0.01}
+    optimizer_kwargs={'learning_rate': 0.001}
     batch_size_train=32
     batch_size_test=32
     

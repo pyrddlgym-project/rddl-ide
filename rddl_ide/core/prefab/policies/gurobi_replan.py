@@ -5,7 +5,8 @@ def build_policy(env):
         rddl=env.model, 
         plan=GurobiStraightLinePlan(), 
         rollout_horizon=5, 
-        model_params={'NonConvex': 2, 'OutputFlag': 1})
+        model_params={'NonConvex': 2, 'OutputFlag': 1}
+    )
 
 def required_env_args():
     return {}

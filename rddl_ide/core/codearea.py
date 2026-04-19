@@ -1,5 +1,5 @@
-import customtkinter
 from tkinter import font
+from customtkinter import CTkTextbox, CTkScrollbar
 from pygments import token
 from pygments.styles import get_style_by_name
 import re
@@ -39,9 +39,20 @@ RDDL_GRAMMAR = [
     (token.Keyword, (r'\b(?P<FTYPES>state-fluent|action-fluent|observ-fluent|'
                      r'interm-fluent|derived-fluent|non-fluent)\b')),
     (token.Keyword.Type, r'\b(?P<TYPES>bool|int|real|object)\b'),
-    (token.Name.Builtin, r"([^.'\"\\#]\b|^)(?P<BUILTIN>exp|log|sin|cos|tan|min|max|pow)\b"),
-    (token.Name.Builtin, r'\b(?P<AGGREGATION>sum|prod|minimum|maximum|exists|forall|argmax|argmin)'),
-    (token.Name.Builtin, r'\b(?P<RANDOM>KronDelta|DiracDelta|Bernoulli|Normal|Gamma|Uniform)'),
+    (token.Name.Builtin, (r"([^.'\"\\#]\b|^)(?P<BUILTIN>abs|sgn|round|floor|ceil|cos|sin|tan|" 
+                          r"acos|asin|atan|cosh|sinh|tanh|exp|ln|sqrt|lngamma|gamma|"
+                          r"div|mod|fmod|min|max|pow|log|hypot"
+                          ")\b")),
+    (token.Name.Builtin, r'\b(?P<AGGREGATION>sum|avg|prod|minimum|maximum|exists|forall|argmax|argmin)'),
+    (token.Name.Builtin, r'\b(?P<MATRIX>det|inverse|pinverse|cholesky)'),
+    (token.Name.Builtin, (r'\b(?P<RANDOM>KronDelta|DiracDelta|Bernoulli|Normal|Uniform|'
+                          r'Poisson|Exponential|Weibull|Gamma|Binomial|NegativeBinomial|'
+                          r'Beta|Geometric|Pareto|Student|Gumbel|Laplace|Cauchy|Gompertz|'
+                          r'ChiSquared|Kumaraswamy|Discrete|UnnormDiscrete|'
+                          r'Discrete(p)|UnnormDiscrete(p)'
+                          r')')),
+    (token.Name.Builtin, (r'\b(?P<RANDOMVECTOR>MultivariateNormal|MultivariateStudent|'
+                          r'Dirichlet|Multinomial)')),
     (token.Name.Variable, r"\?([^,:;+\-\*\/\s}\)\]]+)"),
     (token.Literal, r"\@([^,:;+\-\*\/\s}\)\]]+)"),
     (token.Number, r"\b(?P<NUMBER>((0x|0b|0o|#)[\da-fA-F]+)|((\d*\.)?\d+))\b"),
@@ -49,22 +60,16 @@ RDDL_GRAMMAR = [
 ]
         
 
-class CTkCodeViewer(customtkinter.CTkTextbox):
+class CTkCodeViewer(CTkTextbox):
 
-    def __init__(self, *args,
-                 width: int=100,
-                 height: int=32,
-                 language="python",
-                 theme="monokai",
-                 **kwargs):
+    def __init__(self, *args, width: int=100, height: int=32, 
+                 language='python', theme='monokai', **kwargs):
         super().__init__(*args, width=width, height=height, **kwargs)
-        self._monokai_style = get_style_by_name(theme)
-        self._style_parsed = self._monokai_style.list_styles()
-        for key in self._style_parsed:
+        
+        style_parsed = get_style_by_name(theme).list_styles()
+        for key in style_parsed:
             if key[1]["color"] != "" and key[1]["color"] != None:
-                tag_name = str(key[0])
-                color = "#" + key[1]["color"]
-                self.tag_config(tag_name, foreground=color)
+                self.tag_config(tagName=str(key[0]), foreground="#" + key[1]["color"])
         if language == 'python':
             self.patterns = PYTHON_GRAMMAR
         else:
@@ -72,7 +77,7 @@ class CTkCodeViewer(customtkinter.CTkTextbox):
         self.bind("<KeyRelease>", lambda *args: self.apply())
         
     def apply(self):
-        for tag, pattern in self.patterns:
+        for (tag, pattern) in self.patterns:
             text = self.get('0.0', 'end').splitlines()
             for (i, line) in enumerate(text):
                 for found in re.finditer(pattern, line):
@@ -80,7 +85,7 @@ class CTkCodeViewer(customtkinter.CTkTextbox):
                         str(tag), f"{i + 1}.{found.start()}", f"{i + 1}.{found.end()}")
 
 
-class TextLineNumbers(customtkinter.CTkTextbox):
+class TextLineNumbers(CTkTextbox):
 
     def __init__(self, master, text_widget, **kwargs):
         super().__init__(master, activate_scrollbars=False, **kwargs)
@@ -90,11 +95,10 @@ class TextLineNumbers(customtkinter.CTkTextbox):
             self.text_widget.bind(tag, self.on_key_release)
         
     def on_key_release(self, event=None):
-        p, _ = self.text_widget.index("@0,0").split('.')
-        p = int(p)
+        p = int(self.text_widget.index("@0,0").split('.')[0])
         final_index = str(self.text_widget.index('end'))
-        num_of_lines = final_index.split('.')[0]
-        line_numbers_string = "\n".join(str(p + no) for no in range(int(num_of_lines)))
+        num_of_lines = int(final_index.split('.')[0])
+        line_numbers_string = "\n".join(str(p + no) for no in range(num_of_lines))
                 
         self.configure(state='normal')
         self.delete(0.0, 'end')
@@ -110,13 +114,12 @@ class CodeEditor:
         else:
             my_font = 'Courier'
         text_area = CTkCodeViewer(
-            window, font=(my_font, 12), language=language, theme=theme, wrap='none')
+            window, font=(my_font, 16), language=language, theme=theme, wrap='none')
         self.text = text_area
         
-        ln = TextLineNumbers(window, text_area, width=50, font=(my_font, 12))
+        ln = TextLineNumbers(window, text_area, width=50, font=(my_font, 16))
         ln.pack(side='left', fill='both')
-        text_area.pack(expand=True, fill='both')
-        
-        _ = customtkinter.CTkScrollbar(window, command=text_area.xview)
-        _ = customtkinter.CTkScrollbar(window, command=text_area.yview)
+        text_area.pack(expand=True, fill='both')        
+        CTkScrollbar(window, command=text_area.xview)
+        CTkScrollbar(window, command=text_area.yview)
         
