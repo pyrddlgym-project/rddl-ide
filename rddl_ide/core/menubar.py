@@ -4,7 +4,7 @@ from customtkinter import CTkToplevel, CTkOptionMenu, StringVar, CTkLabel, CTkBu
 from customtkinter import filedialog as fd
 from CTkMenuBar import CustomDropdownMenu
 
-from core.execution import evaluate_policy_fn
+from rddl_ide.core.execution import evaluate_policy_fn
 
 
 def closest_substring(corpus, query, case_sensitive=True):

@@ -1,8 +1,8 @@
 import customtkinter
 from CTkMenuBar import CTkMenuBar
 
-from core.codearea import CodeEditor
-from core.menubar import assign_menubar_functions
+from rddl_ide.core.codearea import CodeEditor
+from rddl_ide.core.menubar import assign_menubar_functions
 
 
 def main():
