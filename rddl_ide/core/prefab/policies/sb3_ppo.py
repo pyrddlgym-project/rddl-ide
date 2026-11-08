@@ -1,11 +1,10 @@
-from stable_baselines3 import PPO
 from pyRDDLGym_rl.core.env import SimplifiedActionRDDLEnv
-from pyRDDLGym_rl.core.agent import StableBaselinesAgent
+from pyRDDLGym_rl.core.sb3_trainer import StableBaselinesTrainer
 
 def build_policy(env):
-    model = PPO('MultiInputPolicy', env, verbose=1)    
-    model.learn(total_timesteps=200000)
-    return StableBaselinesAgent(model)
+    trainer = StableBaselinesTrainer(env, 'ppo')
+    trainer.train(total_timesteps=200000)
+    return trainer.agent()
 
 def required_env_args():
-    return {'vectorized': True, 'base_class': SimplifiedActionRDDLEnv}
+    return {'base_class': SimplifiedActionRDDLEnv, 'action_mode': 'auto'}

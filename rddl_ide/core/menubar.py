@@ -70,7 +70,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     
     # FILE functions
     def create_domain():
-        global domain_file, viz
+        nonlocal domain_file, viz
         domain_file, viz = None, None
         domain_window.title('[Domain] Untitled')
         domain_editor.delete(1.0, 'end')
@@ -78,7 +78,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         domain_editor.apply()
         
     def create_instance():
-        global inst_file
+        nonlocal inst_file
         inst_file = None
         inst_window.title('[Instance] Untitled')
         inst_editor.delete(1.0, 'end')
@@ -95,7 +95,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
             editor.apply()
         
     def open_domain():
-        global domain_file, viz    
+        nonlocal domain_file, viz    
         domain_file = fd.askopenfilename(defaultextension='.rddl',
                                          filetypes=[('RDDL File', '*.rddl*')])
         viz = None
@@ -103,7 +103,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         _window_from_file(domain_window, domain_editor, 'Domain', domain_file)
     
     def open_instance():
-        global inst_file        
+        nonlocal inst_file        
         inst_file = fd.askopenfilename(defaultextension='.rddl',
                                        filetypes=[('RDDL File', '*.rddl*')])
         if inst_file == '': inst_file = None            
@@ -114,11 +114,11 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     
         def __init__(self, *args, **kwargs):
             super(ToplevelWindow, self).__init__(*args, **kwargs)
-            abs_path = os.path.dirname(os.path.abspath(__file__))
-            self.after(250, lambda: self.iconbitmap(os.path.join(abs_path, 'icon.ico')))
+            pkg_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.after(250, lambda: self.iconbitmap(os.path.join(pkg_path, 'icon.ico')))
         
     def open_from_dialog():
-        global domain_file, inst_file, viz
+        nonlocal domain_file, inst_file, viz
         master = ToplevelWindow(domain_window)
         
         def changed_context(*args):
@@ -138,14 +138,14 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         context_options = manager.list_contexts()
         context_var = StringVar(master)
         context_var.set(context_options[0])
-        context_var.trace('w', changed_context)
+        context_var.trace_add('write', changed_context)
         context_dropdown = CTkOptionMenu(
             master, variable=context_var, values=context_options)
         
         domain_options = manager.list_problems()
         domain_var = StringVar(master)
         domain_var.set(domain_options[0])
-        domain_var.trace('w', changed_domain)
+        domain_var.trace_add('write', changed_domain)
         domain_dropdown = CTkOptionMenu(
             master, variable=domain_var, values=domain_options)
         
@@ -171,7 +171,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
             master.destroy()   
             
         def select_problem():
-            global domain_file, inst_file, viz
+            nonlocal domain_file, inst_file, viz
             domain, instance = domain_var.get(), instance_var.get()
             manager = RDDLRepoManager()
             info = manager.get_problem(domain)
@@ -197,7 +197,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
             window.title(f'[{caption}] {os.path.basename(file_path)}')
     
     def save_domain():
-        global domain_file        
+        nonlocal domain_file        
         if domain_file is None:
             domain_file = fd.asksaveasfilename(initialfile='domain.rddl',
                                                defaultextension='.rddl',
@@ -206,7 +206,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         _window_to_file(domain_window, domain_editor, 'Domain', domain_file)
         
     def save_instance():
-        global inst_file        
+        nonlocal inst_file        
         if inst_file is None:
             inst_file = fd.asksaveasfilename(initialfile='instance.rddl',
                                              defaultextension='.rddl',
@@ -215,12 +215,12 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         _window_to_file(inst_window, inst_editor, 'Instance', inst_file)
     
     def save_domain_as():
-        global domain_file        
+        nonlocal domain_file        
         domain_file = None
         save_domain()
     
     def save_instance_as():
-        global inst_file        
+        nonlocal inst_file        
         inst_file = None
         save_instance()
         
@@ -268,7 +268,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         context_options = manager.list_contexts()
         context_var = StringVar(master)
         context_var.set(context_options[0])
-        context_var.trace('w', changed_context)
+        context_var.trace_add('write', changed_context)
         context_dropdown = CTkOptionMenu(
             master, variable=context_var, values=context_options)
         
@@ -372,7 +372,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         
     # policy RUN functions
     def _evaluate(record):
-        global domain_file, inst_file, viz
+        nonlocal domain_file, inst_file, viz
         save_domain()
         save_instance()
         if domain_file is not None and inst_file is not None:
@@ -388,7 +388,9 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         _evaluate(None)
     
     def record():
-        _evaluate(fd.askdirectory())
+        save_dir = fd.askdirectory()
+        if save_dir:
+            _evaluate(save_dir)
         
     # domain menu bars
     domain_menu_file = domain_menu.add_cascade("File")

@@ -1,3 +1,4 @@
+import re
 import sys
 import traceback
 from tkinter import messagebox
@@ -5,17 +6,18 @@ from tkinter import messagebox
 import pyRDDLGym
 from pyRDDLGym.core.visualizer.movie import MovieGenerator
 
+_ANSI_CODE = re.compile(r'\033\[[0-9;]*m')
+
 
 def _handle_error_message(err):
-    
-    if '\033[4m' in err and '\033[0m' in err:  # syntax error
-        start = err.index('\033[4m') + len('\033[4m')
-        end = err.index('\033[0m')
-        err = err[start:end].strip()
+
+    syntax_error = re.search(r'\033\[4m(.*?)\033\[(?:24|0)m', err)
+    if syntax_error is not None:  # syntax error: the underlined line
+        err = syntax_error.group(1).strip()
     
     elif '>>' in err:  # compiler error in general
         start = err.index('>>') + len('>>')
-        err = err[start:]    
+        err = _ANSI_CODE.sub('', err[start:])
         if 'Please check expression' in err:
             end = err.index('Please check expression')
             err = err[:end]
@@ -37,7 +39,8 @@ def evaluate_policy_fn(domain_file, inst_file, policy_editor, viz, record):
     except Exception as e:
         print(traceback.format_exc(), file=sys.stderr)
         messagebox.showerror('Python error', e)
-        
+        return None
+
     # evaluation handle
     def target():
         try:
@@ -56,7 +59,9 @@ def evaluate_policy_fn(domain_file, inst_file, policy_editor, viz, record):
             return e
     
     err = target()
-    if err is not None:
-        messagebox.showerror('pyRDDLGym error', err)
-    return _handle_error_message(str(err))
+    if err is None:
+        return None
+    err = str(err)
+    messagebox.showerror('pyRDDLGym error', _ANSI_CODE.sub('', err))
+    return _handle_error_message(err)
 

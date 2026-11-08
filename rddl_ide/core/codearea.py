@@ -32,23 +32,25 @@ PYTHON_GRAMMAR = [
 ]
 
 RDDL_GRAMMAR = [
-    (token.Keyword, r'\b(?P<KEYWORD>if|then|else|switch|case|default)\b'),
-    (token.Keyword, (r'\b(?P<COMPONENT>domain|requirements|types|objects|pvariables|cpfs|reward|'
-                     r'action-preconditions|state-invariants|termination|'
+    (token.Keyword, r'\b(?P<KEYWORD>if|then|else|switch|case|default|otherwise)\b'),
+    (token.Keyword, (r'\b(?P<COMPONENT>domain|requirements|types|objects|pvariables|cpfs|cdfs|reward|'
+                     r'action-preconditions|state-action-constraints|state-invariants|'
+                     r'termination|terminate-when|terminal|policy|'
                      r'instance|init-state|non-fluents|max-nondef-actions|horizon|discount)\b')),
     (token.Keyword, (r'\b(?P<FTYPES>state-fluent|action-fluent|observ-fluent|'
-                     r'interm-fluent|derived-fluent|non-fluent)\b')),
+                     r'interm-fluent|derived-fluent|non-fluent|param-fluent)\b')),
     (token.Keyword.Type, r'\b(?P<TYPES>bool|int|real|object)\b'),
+    (token.Keyword.Constant, r'\b(?P<CONSTANT>true|false|pos-inf|neg-inf)\b'),
     (token.Name.Builtin, (r"([^.'\"\\#]\b|^)(?P<BUILTIN>abs|sgn|round|floor|ceil|cos|sin|tan|" 
                           r"acos|asin|atan|cosh|sinh|tanh|exp|ln|sqrt|lngamma|gamma|"
-                          r"div|mod|fmod|min|max|pow|log|hypot"
-                          ")\b")),
+                          r"div|mod|fmod|min|max|pow|log|hypot|probe"
+                          r")\b")),
     (token.Name.Builtin, r'\b(?P<AGGREGATION>sum|avg|prod|minimum|maximum|exists|forall|argmax|argmin)'),
-    (token.Name.Builtin, r'\b(?P<MATRIX>det|inverse|pinverse|cholesky)'),
+    (token.Name.Builtin, r'\b(?P<MATRIX>det|inverse|pinverse|cholesky|row|col)\b'),
     (token.Name.Builtin, (r'\b(?P<RANDOM>KronDelta|DiracDelta|Bernoulli|Normal|Uniform|'
                           r'Poisson|Exponential|Weibull|Gamma|Binomial|NegativeBinomial|'
                           r'Beta|Geometric|Pareto|Student|Gumbel|Laplace|Cauchy|Gompertz|'
-                          r'ChiSquared|Kumaraswamy|Discrete|UnnormDiscrete|'
+                          r'ChiSquare|Kumaraswamy|Discrete|UnnormDiscrete|'
                           r'Discrete(p)|UnnormDiscrete(p)'
                           r')')),
     (token.Name.Builtin, (r'\b(?P<RANDOMVECTOR>MultivariateNormal|MultivariateStudent|'

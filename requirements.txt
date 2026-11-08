@@ -1,5 +1,0 @@
-tk
-Pygments>=2.18.0
-customtkinter>=5.2.2
-CTkMenuBar>=0.7
-pyRDDLGym>=2.0
