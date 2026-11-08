@@ -56,8 +56,7 @@ def load_policy(name):
     return content    
 
 
-def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window, 
-                             policy_menu, policy_window,
+def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                              domain_editor, inst_editor, policy_editor):
     domain_file, inst_file, viz = None, None, None
     
@@ -72,7 +71,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     def create_domain():
         nonlocal domain_file, viz
         domain_file, viz = None, None
-        domain_window.title('[Domain] Untitled')
+        domain_pane.title('Domain: Untitled')
         domain_editor.delete(1.0, 'end')
         domain_editor.insert(1.0, DOMAIN_TEMPLATE)
         domain_editor.apply()
@@ -80,14 +79,14 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     def create_instance():
         nonlocal inst_file
         inst_file = None
-        inst_window.title('[Instance] Untitled')
+        inst_pane.title('Instance: Untitled')
         inst_editor.delete(1.0, 'end')
         inst_editor.insert(1.0, INSTANCE_TEMPLATE)
         inst_editor.apply()
     
-    def _window_from_file(window, editor, caption, file_path):
+    def _pane_from_file(window, editor, caption, file_path):
         if file_path is not None:
-            window.title(f'[{caption}] {os.path.basename(file_path)}')
+            window.title(f'{caption}: {os.path.basename(file_path)}')
             editor.delete(1.0, 'end')
             with open(file_path, 'r') as new_file:
                 editor.insert(1.0, new_file.read())
@@ -100,14 +99,14 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
                                          filetypes=[('RDDL File', '*.rddl*')])
         viz = None
         if domain_file == '': domain_file = None            
-        _window_from_file(domain_window, domain_editor, 'Domain', domain_file)
+        _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
     
     def open_instance():
         nonlocal inst_file        
         inst_file = fd.askopenfilename(defaultextension='.rddl',
                                        filetypes=[('RDDL File', '*.rddl*')])
         if inst_file == '': inst_file = None            
-        _window_from_file(inst_window, inst_editor, 'Instance', inst_file)
+        _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)
     
     
     class ToplevelWindow(CTkToplevel):
@@ -119,7 +118,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         
     def open_from_dialog():
         nonlocal domain_file, inst_file, viz
-        master = ToplevelWindow(domain_window)
+        master = ToplevelWindow(root)
         
         def changed_context(*args):
             domain_options = manager.list_problems_by_context(context_var.get())
@@ -167,7 +166,6 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         e2.grid(row=2, column=1)
         
         def close_me():
-            master.quit()      
             master.destroy()   
             
         def select_problem():
@@ -179,8 +177,8 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
             inst_file = info.get_instance(instance)
             viz = info.get_visualizer()   
                      
-            _window_from_file(domain_window, domain_editor, 'Domain', domain_file)
-            _window_from_file(inst_window, inst_editor, 'Instance', inst_file)            
+            _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
+            _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)            
             close_me()
             domain_file, inst_file = None, None
         
@@ -189,12 +187,12 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         CTkButton(master, text='Close', command=close_me).grid(
             row=3, column=1, sticky='w', pady=4)
     
-    def _window_to_file(window, editor, caption, file_path):
+    def _pane_to_file(window, editor, caption, file_path):
         if file_path is not None: 
             with open(file_path, 'w') as new_file:
                 new_file.write(editor.get(1.0, 'end'))
                 new_file.close()
-            window.title(f'[{caption}] {os.path.basename(file_path)}')
+            window.title(f'{caption}: {os.path.basename(file_path)}')
     
     def save_domain():
         nonlocal domain_file        
@@ -203,7 +201,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
                                                defaultextension='.rddl',
                                                filetypes=[('RDDL File', '*.rddl*')])
             if domain_file == '': domain_file = None 
-        _window_to_file(domain_window, domain_editor, 'Domain', domain_file)
+        _pane_to_file(domain_pane, domain_editor, 'Domain', domain_file)
         
     def save_instance():
         nonlocal inst_file        
@@ -212,7 +210,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
                                              defaultextension='.rddl',
                                              filetypes=[('RDDL File', '*.rddl*')])
             if inst_file == '': inst_file = None 
-        _window_to_file(inst_window, inst_editor, 'Instance', inst_file)
+        _pane_to_file(inst_pane, inst_editor, 'Instance', inst_file)
     
     def save_domain_as():
         nonlocal domain_file        
@@ -225,11 +223,10 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         save_instance()
         
     def exit_application():
-        domain_window.destroy() 
-        inst_window.destroy() 
+        root.destroy()
     
     def register_domain():        
-        master = ToplevelWindow(domain_window)
+        master = ToplevelWindow(root)
         CTkLabel(master, text="Context").grid(row=0)
         CTkLabel(master, text="Domain Name").grid(row=1)
         e1 = CTkEntry(master)
@@ -238,7 +235,6 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         e2.grid(row=1, column=1)
         
         def close_me():
-            master.quit()      
             master.destroy()   
             
         def save_domain():
@@ -255,7 +251,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
             row=2, column=1, sticky='w', pady=4)
     
     def register_instance():
-        master = ToplevelWindow(domain_window)
+        master = ToplevelWindow(root)
         
         from rddlrepository.core.manager import RDDLRepoManager
         manager = RDDLRepoManager() 
@@ -289,7 +285,6 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         e2.grid(row=2, column=1)
         
         def close_me():
-            master.quit()      
             master.destroy()   
         
         def save_instance():
@@ -302,30 +297,30 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         CTkButton(master, text='Close', command=close_me).grid(
             row=3, column=1, sticky='w', pady=4)
         
-    # EDIT functions
-    def copy_domain_text():
-        domain_editor.event_generate('<<Copy>>')
-    
-    def copy_instance_text():
-        inst_editor.event_generate('<<Copy>>')
-    
-    def cut_domain_text():
-        domain_editor.event_generate('<<Cut>>')
-        
-    def cut_instance_text():
-        inst_editor.event_generate('<<Cut>>')
-    
-    def paste_domain_text():
-        domain_editor.event_generate('<<Paste>>')
-        
-    def paste_instance_text():
-        inst_editor.event_generate('<<Paste>>')
-    
+    # EDIT functions act on whichever editor last had the keyboard focus
+    last_focused = [domain_editor]
+    for editor in (domain_editor, inst_editor, policy_editor):
+        editor.bind('<FocusIn>', lambda _, e=editor: last_focused.__setitem__(0, e), add='+')
+
+    def _edit_event(event):
+        editor = last_focused[0]
+        editor.focus_set()
+        editor._textbox.event_generate(event)  # CTkTextbox does not forward events
+
+    def copy_text():
+        _edit_event('<<Copy>>')
+
+    def cut_text():
+        _edit_event('<<Cut>>')
+
+    def paste_text():
+        _edit_event('<<Paste>>')
+
     # policy SELECT functions
-    def _fill_policy_window(policy_name, caption):
+    def _fill_policy_pane(policy_name, caption):
         policy_editor.delete(1.0, 'end')
         policy_editor.insert(1.0, load_policy(policy_name))
-        policy_window.title(f'[Policy] {caption}')
+        policy_pane.title(f'Policy: {caption}')
         policy_editor.apply()
     
     def load_policy_from_file():
@@ -335,7 +330,7 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
             with open(policy_file, 'r') as policy_file:
                 policy_editor.delete(1.0, 'end')
                 policy_editor.insert(1.0, policy_file.read())
-                policy_window.title('[Policy] Custom')
+                policy_pane.title('Policy: Custom')
                 policy_editor.apply()
         
     def save_policy_as():
@@ -348,27 +343,27 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
                 new_file.close()
         
     def load_noop():
-        _fill_policy_window('noop', 'NoOp')
+        _fill_policy_pane('noop', 'NoOp')
     
     load_noop()
         
     def load_random(): 
-        _fill_policy_window('random', 'Random')
+        _fill_policy_pane('random', 'Random')
     
     def load_jax_slp():
-        _fill_policy_window('jax_slp', 'JAX-SLP')
+        _fill_policy_pane('jax_slp', 'JAX-SLP')
         
     def load_jax_replan():
-        _fill_policy_window('jax_replan', 'JAX-SLP-Replan')
+        _fill_policy_pane('jax_replan', 'JAX-SLP-Replan')
         
     def load_jax_drp():
-        _fill_policy_window('jax_drp', 'JAX-DRP')
+        _fill_policy_pane('jax_drp', 'JAX-DRP')
         
     def load_gurobi_replan():
-        _fill_policy_window('gurobi_replan', 'Gurobi-SLP-Replan')
+        _fill_policy_pane('gurobi_replan', 'Gurobi-SLP-Replan')
         
     def load_sb3_ppo():
-        _fill_policy_window('sb3_ppo', 'StableBaselines3-PPO')
+        _fill_policy_pane('sb3_ppo', 'StableBaselines3-PPO')
         
     # policy RUN functions
     def _evaluate(record):
@@ -392,8 +387,8 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
         if save_dir:
             _evaluate(save_dir)
         
-    # domain menu bars
-    domain_menu_file = domain_menu.add_cascade("File")
+    # domain menu
+    domain_menu_file = menu.add_cascade("Domain")
     domain_menu_file_drop = CustomDropdownMenu(widget=domain_menu_file, font=("Roboto", 14))
     domain_menu_file_drop.add_option(option='New Domain', command=create_domain)
     domain_menu_file_drop.add_separator()
@@ -407,14 +402,8 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(option='Exit', command=exit_application)
     
-    domain_menu_edit = domain_menu.add_cascade("Edit")
-    domain_menu_edit_drop = CustomDropdownMenu(widget=domain_menu_edit, font=("Roboto", 14))
-    domain_menu_edit_drop.add_option(option='Copy', command=copy_domain_text)
-    domain_menu_edit_drop.add_option(option='Cut', command=cut_domain_text)
-    domain_menu_edit_drop.add_option(option='Paste', command=paste_domain_text)
-    
-    # instance menu bar
-    inst_menu_file = inst_menu.add_cascade("File")
+    # instance menu
+    inst_menu_file = menu.add_cascade("Instance")
     inst_menu_file_drop = CustomDropdownMenu(widget=inst_menu_file, font=("Roboto", 14))
     inst_menu_file_drop.add_option(option='New Instance', command=create_instance)
     inst_menu_file_drop.add_separator()
@@ -425,21 +414,14 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     inst_menu_file_drop.add_separator()
     inst_menu_file_drop.add_option(option='Register Instance in rddlrepository...', command=register_instance)
     
-    # instance edit menu
-    inst_menu_edit = inst_menu.add_cascade("Edit")
-    inst_menu_edit_drop = CustomDropdownMenu(widget=inst_menu_edit, font=("Roboto", 14))
-    inst_menu_edit_drop.add_option(option='Copy', command=copy_instance_text)
-    inst_menu_edit_drop.add_option(option='Cut', command=cut_instance_text)
-    inst_menu_edit_drop.add_option(option='Paste', command=paste_instance_text)
-    
-    # policy file menu
-    policy_file_menu = policy_menu.add_cascade("File")
+    # policy menu
+    policy_file_menu = menu.add_cascade("Policy")
     policy_file_menu_drop = CustomDropdownMenu(widget=policy_file_menu, font=("Roboto", 14))
     policy_file_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
     policy_file_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
     
     # policy load menu
-    policy_load_menu = policy_menu.add_cascade("Baseline")
+    policy_load_menu = menu.add_cascade("Baseline")
     policy_load_menu_drop = CustomDropdownMenu(widget=policy_load_menu, font=("Roboto", 14))
     policy_load_menu_drop.add_option(option='No-Op', command=load_noop)
     policy_load_menu_drop.add_option(option='Random', command=load_random)
@@ -452,8 +434,15 @@ def assign_menubar_functions(domain_menu, domain_window, inst_menu, inst_window,
     policy_load_menu_drop.add_separator()
     policy_load_menu_drop.add_option(option='Stable-Baselines3 (PPO)', command=load_sb3_ppo)
     
+    # edit menu, for the editor that last had the focus
+    edit_menu = menu.add_cascade("Edit")
+    edit_menu_drop = CustomDropdownMenu(widget=edit_menu, font=("Roboto", 14))
+    edit_menu_drop.add_option(option='Copy', command=copy_text)
+    edit_menu_drop.add_option(option='Cut', command=cut_text)
+    edit_menu_drop.add_option(option='Paste', command=paste_text)
+
     # policy run menu
-    policy_run_menu = policy_menu.add_cascade("Run")
+    policy_run_menu = menu.add_cascade("Run")
     policy_run_menu_drop = CustomDropdownMenu(widget=policy_run_menu, font=("Roboto", 14))
     policy_run_menu_drop.add_option(option='Evaluate', command=evaluate)
     policy_run_menu_drop.add_option(option='Record', command=record)
