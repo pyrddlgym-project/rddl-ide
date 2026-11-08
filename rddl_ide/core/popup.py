@@ -41,7 +41,7 @@ def _rounded_rectangle(canvas, x1, y1, x2, y2, radius, **kwargs):
     return canvas.create_polygon(points, smooth=True, **kwargs)
 
 
-def _work_area(widget: tkinter.Misc, x: int, y: int) -> Tuple[int, int, int, int]:
+def work_area(widget: tkinter.Misc, x: int, y: int) -> Tuple[int, int, int, int]:
     '''The (left, top, right, bottom) of the screen at (x, y), less the taskbar, in the
     pixels of winfo_rootx. On Windows, Tk reports the screen size unscaled by the
     display's DPI scaling while it places windows in device pixels, so the monitor's
@@ -104,7 +104,7 @@ class PopupMenu:
         # (scrolling then shows the others)
         (x, below, above) = (anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height(),
                              anchor.winfo_rooty())
-        (left, top, right, bottom) = _work_area(anchor, x, above)
+        (left, top, right, bottom) = work_area(anchor, x, above)
         (gap, margin) = (s(2), s(SCREEN_MARGIN))
         room = bottom - top - 2 * margin - 2
         if room < total <= room + pad:  # all rows fit without the bottom padding

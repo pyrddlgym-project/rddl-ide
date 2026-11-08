@@ -9,6 +9,7 @@ from customtkinter import filedialog as fd
 from rddl_ide.core.appicon import set_icon
 from rddl_ide.core.errorlocation import locate_error
 from rddl_ide.core.execution import evaluate_policy
+from rddl_ide.core.icons import RECORD_COLOR, IconButton
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
 from rddl_ide.core.statusbar import RunProgress
@@ -188,6 +189,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         if active_run is not None:
             active_run.stop()
 
+    run_state = []  # called with whether a run is going on, when that changes
+
     root.protocol('WM_DELETE_WINDOW', exit_application)
     
     def register_domain():        
@@ -335,11 +338,15 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                 _show_error('Policy error', error)
                 return
             active_run = progress
+            for show in run_state:
+                show(True)
             try:
                 message = evaluate_policy(domain_file, inst_file, build_policy,
                                           required_env_args, viz, record, progress)
             finally:
                 active_run = None
+                for show in run_state:
+                    show(False)
             if close_after_run:
                 root.destroy()
                 return
@@ -418,3 +425,35 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     view_menu = menu.add_cascade("View")
     view_menu_drop = MenuBarMenu(view_menu)
     view_menu_drop.add_option(option='Toggle Light/Dark Theme', command=toggle_theme)
+
+    # buttons: on the right of the menu bar and of the header of each pane
+    menu.grid_columnconfigure(menu.num, weight=1)  # pushes the next column to the right
+    theme_button = IconButton(menu, 'moon', 'Toggle light/dark theme', toggle_theme,
+                              dark_name='sun')
+    theme_button.grid(row=0, column=menu.num + 1, padx=(0, 6), pady=2)
+
+    for (header, noun, commands) in (
+            (domain_pane.header, 'domain',
+             (create_domain, open_domain, save_domain, save_domain_as)),
+            (inst_pane.header, 'instance',
+             (create_instance, open_instance, save_instance, save_instance_as))):
+        for (icon, tooltip, command) in zip(
+                ('new', 'load', 'save', 'save_as'),
+                (f'New {noun}', f'Load {noun} from file', f'Save {noun}',
+                 f'Save {noun} as'), commands):
+            header.add_button(icon, tooltip, command)
+
+    policy_header = policy_pane.header
+    policy_header.add_button('load', 'Load policy from file', load_policy_from_file)
+    policy_header.add_button('save', 'Save policy as', save_policy_as)
+    policy_header.add_gap()
+    run_buttons = [policy_header.add_button('run', 'Evaluate', evaluate),
+                   policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)]
+    stop_button = policy_header.add_button('stop', 'Stop', stop_run)
+    stop_button.set_enabled(False)
+
+    def show_running(running):
+        for button in run_buttons:
+            button.set_enabled(not running)
+        stop_button.set_enabled(running)
+    run_state.append(show_running)
