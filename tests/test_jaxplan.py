@@ -77,17 +77,48 @@ class TestJaxPlanProvider(unittest.TestCase):
         self.assertEqual(self.provider.section('auxiliary').option(self.state), 'None')
 
     def test_optimizer_choices_come_from_optax(self):
-        optimizer = self.provider.section('optimizer')
-        options = optimizer.options(self.state)
+        fields = self.fields('planner')
+        options = fields['optimizer'].options
         self.assertGreaterEqual(len(options), 20)
         self.assertIn('adam', options)
-        self.assertEqual(optimizer.option(self.state), 'rmsprop')
-        self.choose('optimizer', 'adam')
-        self.assertIn('b1', self.fields('optimizer'))
-        self.state.set_text('optimizer', 'adam', 'learning_rate', '0.003')
-        values = read_config(self.provider.to_config(self.state))['Planner']
+        self.assertEqual(fields['optimizer'].default.__name__, 'rmsprop')
+        self.assertIn('decay', [f.name for f in fields['optimizer_kwargs'].nested])
+        self.state.set_text('planner', 'JaxBackpropPlanner', 'optimizer', 'adam')
+        nested = [f.name for f in self.fields('planner')['optimizer_kwargs'].nested]
+        self.assertIn('b1', nested)
+        self.state.set_text('planner', 'JaxBackpropPlanner', 'optimizer_kwargs.b1', '0.8')
+        with self.assertRaisesRegex(ValueError, r'optimizer_kwargs\.learning_rate'):
+            self.provider.to_config(self.state)
+        self.state.set_text('planner', 'JaxBackpropPlanner',
+                            'optimizer_kwargs.learning_rate', '0.003')
+        config = self.provider.to_config(self.state)
+        values = read_config(config)['Planner']
         self.assertEqual(values['optimizer'], 'adam')
-        self.assertEqual(values['optimizer_kwargs'], {'learning_rate': 0.003})
+        self.assertEqual(values['optimizer_kwargs'], {'learning_rate': 0.003, 'b1': 0.8})
+        self.assertEqual(self.provider.to_config(self.provider.from_config(config)), config)
+
+    def test_auxiliary_optimizers_behave_like_the_planner_ones(self):
+        self.choose('auxiliary', 'JaxPGPEPlanner')
+        fields = self.fields('auxiliary')
+        self.assertIsNotNone(fields['optimizer'].options)
+        self.assertEqual(fields['optimizer_sigma'].options[0], 'None')
+
+        # the sigma table follows optimizer_sigma once set, else the optimizer
+        self.assertIn('b1', [f.name for f in fields['optimizer_kwargs_sigma'].nested])
+        self.state.set_text('auxiliary', 'JaxPGPEPlanner', 'optimizer_sigma', 'sgd')
+        fields = self.fields('auxiliary')
+        self.assertIn('momentum', [f.name for f in fields['optimizer_kwargs_sigma'].nested])
+        self.assertIn('b1', [f.name for f in fields['optimizer_kwargs_mu'].nested])
+
+        self.state.set_text('auxiliary', 'JaxPGPEPlanner',
+                            'optimizer_kwargs_sigma.learning_rate', '0.2')
+        config = self.provider.to_config(self.state)
+        values = read_config(config)['Planner']
+        self.assertEqual(values['auxiliary_kwargs'],
+                         {'optimizer_sigma': 'sgd', 'optimizer_kwargs_sigma': {'learning_rate': 0.2}})
+        self.assertEqual(self.provider.to_config(self.provider.from_config(config)), config)
+        planner_args, _, _ = jax_config.load_config_from_string(config)
+        self.assertEqual(planner_args['auxiliary'].optimizer_sigma_name.__name__, 'sgd')
 
     def test_traced_and_untraced_kwargs(self):
         fields = self.fields('planner')

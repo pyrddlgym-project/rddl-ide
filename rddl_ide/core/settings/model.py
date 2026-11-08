@@ -20,10 +20,12 @@ _UNSET = object()
 @dataclass
 class Field:
     '''One setting: an argument name, its default, and optionally the settings of the
-    function that a **kwargs dictionary setting is passed to.'''
+    function that a **kwargs dictionary setting is passed to, or the names it can be set
+    to (shown as a dropdown, and written to configs as strings).'''
     name: str
     default: Any = MISSING
     nested: Optional[List['Field']] = None
+    options: Optional[List[str]] = None
 
     @property
     def required(self) -> bool:
@@ -119,10 +121,6 @@ class FormState:
         self.extras[section] = text
 
 
-def _always(state: FormState) -> bool:
-    return True
-
-
 def _no_options(state: FormState) -> List[str]:
     return []
 
@@ -145,9 +143,7 @@ class Section:
     chooser: Optional[str] = None
     options: Callable[[FormState], List[str]] = _no_options
     default_option: Callable[[FormState], Optional[str]] = _no_default
-    visible: Callable[[FormState], bool] = _always
     scope: Callable[[FormState], str] = _no_scope
-    required_when_used: bool = False  # required fields only count once any is changed
 
     def choice_key(self, state: FormState) -> str:
         return f'{self.id}@{self.scope(state)}'
@@ -218,7 +214,7 @@ def changed_values(state: FormState, section: Section,
                 if sub.required and sub.name not in nested:
                     raise ValueError(f'{section.title}: {field.name}.{sub.name} is required.')
             values[field.name] = nested
-    if missing and (values or not section.required_when_used):
+    if missing:
         raise ValueError(f'{section.title}: {missing[0]} is required.')
     extra = state.extra(section.id).strip()
     if extra:

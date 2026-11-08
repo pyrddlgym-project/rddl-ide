@@ -397,19 +397,6 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     inst_menu_file_drop.add_separator()
     inst_menu_file_drop.add_option(option='Register Instance in rddlrepository...', command=register_instance)
     
-    # policy menu
-    policy_file_menu = menu.add_cascade("Policy")
-    policy_file_menu_drop = CustomDropdownMenu(widget=policy_file_menu, font=("Roboto", 14))
-    policy_file_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
-    policy_file_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
-    
-    # policy load menu
-    policy_load_menu = menu.add_cascade("Baseline")
-    policy_load_menu_drop = CustomDropdownMenu(widget=policy_load_menu, font=("Roboto", 14))
-    for (kind, title, _) in PROVIDERS:
-        policy_load_menu_drop.add_option(
-            option=title, command=lambda kind=kind: policy_pane.show_form(kind))
-    
     # edit menu, for the editor that last had the focus
     edit_menu = menu.add_cascade("Edit")
     edit_menu_drop = CustomDropdownMenu(widget=edit_menu, font=("Roboto", 14))
@@ -417,8 +404,15 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     edit_menu_drop.add_option(option='Cut', command=cut_text)
     edit_menu_drop.add_option(option='Paste', command=paste_text)
 
-    # policy run menu
-    policy_run_menu = menu.add_cascade("Run")
-    policy_run_menu_drop = CustomDropdownMenu(widget=policy_run_menu, font=("Roboto", 14))
-    policy_run_menu_drop.add_option(option='Evaluate', command=evaluate)
-    policy_run_menu_drop.add_option(option='Record', command=record)
+    # agent menu: the policy file, the built-in baselines, and running the policy
+    agent_menu = menu.add_cascade("Agent")
+    agent_menu_drop = CustomDropdownMenu(widget=agent_menu, font=("Roboto", 14))
+    agent_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
+    agent_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
+    agent_menu_drop.add_separator()
+    for (kind, title, _) in PROVIDERS:
+        agent_menu_drop.add_option(
+            option=title, command=lambda kind=kind: policy_pane.show_form(kind))
+    agent_menu_drop.add_separator()
+    agent_menu_drop.add_option(option='Evaluate', command=evaluate)
+    agent_menu_drop.add_option(option='Record', command=record)

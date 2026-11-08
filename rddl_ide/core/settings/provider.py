@@ -59,12 +59,23 @@ def assign(state: FormState, section: Section, values: Dict[str, Any]) -> None:
     '''Puts values read from a config into the form fields of a section; values that
     match no field are kept in the section's additional settings.'''
     option = section.option(state)
+
+    # choices first, since the settings nested under other fields can depend on them
     fields = {field.name: field for field in section.fields(option, state)}
+    for (name, value) in values.items():
+        field = fields.get(name)
+        if field is not None and field.options is not None:
+            state.set_text(section.id, option, name,
+                           value if isinstance(value, str) else format_value(value))
+    fields = {field.name: field for field in section.fields(option, state)}
+
     extras = {}
     for (name, value) in values.items():
         field = fields.get(name)
         if field is None:
             extras[name] = value
+        elif field.options is not None:
+            continue
         elif field.nested is not None and isinstance(value, dict) and \
                 set(value) <= {sub.name for sub in field.nested}:
             for (sub, sub_value) in value.items():

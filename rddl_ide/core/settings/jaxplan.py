@@ -1,4 +1,5 @@
 '''JaxPlan (pyRDDLGym-jax) as a settings form, read from the installed package.'''
+import dataclasses
 import functools
 import inspect
 import os
@@ -22,7 +23,13 @@ NOT_CONFIGURABLE_OPTIMIZE = {'subs', 'guess', 'model_params', 'critic_params',
                              'dashboard_id', 'tqdm_position', 'planner'}
 
 # settings of the planner shown in sections of their own
-PLANNER_CHOICES = {'auxiliary', 'optimizer', 'optimizer_kwargs'}
+PLANNER_CHOICES = {'auxiliary'}
+
+# arguments that the config loader resolves from a name to an optax optimizer; the
+# settings of an optimizer_kwargs[_suffix] table are those of optimizer[_suffix] if the
+# class has it and it is set, else of optimizer
+OPTIMIZER_ARGS = ('optimizer', 'optimizer_sigma')
+OPTIMIZER_KWARGS = 'optimizer_kwargs'
 
 TRACE_MODULES = (planner, plan, logic)
 
@@ -43,6 +50,40 @@ def optax_optimizers() -> List[str]:
                 'GradientTransformation' in str(signature.return_annotation):
             names.append(name)
     return sorted(names)
+
+
+@functools.lru_cache(maxsize=None)
+def _optax_fields(name: str) -> List[Field]:
+    return signature_fields(getattr(optax, name))
+
+
+def with_optimizer_choices(fields: List[Field], section_id: str, option: Optional[str],
+                           state: FormState) -> List[Field]:
+    '''Shows each optimizer argument as a dropdown of optax optimizers, and the settings
+    of the optimizer chosen for each optimizer_kwargs table as that table's settings.'''
+    by_name = {field.name: field for field in fields}
+
+    def chosen(name):
+        text = state.text(section_id, option, name)
+        value = by_name[name].default if text is None or not text.strip() else text.strip()
+        return getattr(value, '__name__', value)
+
+    result = []
+    for field in fields:
+        if field.name in OPTIMIZER_ARGS:
+            options = optax_optimizers()
+            if field.default is None:
+                options = ['None'] + options
+            field = dataclasses.replace(field, options=options)
+        elif field.name.startswith(OPTIMIZER_KWARGS):
+            own = 'optimizer' + field.name[len(OPTIMIZER_KWARGS):]
+            name = chosen(own) if own in by_name else None
+            if name in (None, 'None') and 'optimizer' in by_name:
+                name = chosen('optimizer')
+            nested = _optax_fields(name) if name in optax_optimizers() else None
+            field = dataclasses.replace(field, nested=nested)
+        result.append(field)
+    return result
 
 
 def _default_of(obj, name: str) -> Any:
@@ -105,14 +146,6 @@ class JaxPlanProvider(Provider):
         return fields_with_traced_kwargs(self.plans[option], TRACE_MODULES)
 
     @functools.lru_cache(maxsize=None)
-    def _optimizer_fields(self, option: str, planner_option: str) -> List[Field]:
-        has_kwargs = any(f.name == 'optimizer_kwargs'
-                         for f in signature_fields(self.planners[planner_option]))
-        if not has_kwargs or not hasattr(optax, option):
-            return []
-        return signature_fields(getattr(optax, option))
-
-    @functools.lru_cache(maxsize=None)
     def _optimize_fields(self) -> List[Field]:
         fields = signature_fields(planner.JaxPlanner.optimize_generator, NOT_CONFIGURABLE_OPTIMIZE)
         names = {field.name for field in fields}
@@ -124,13 +157,6 @@ class JaxPlanProvider(Provider):
         default = _default_of(self._planner_class(state), 'auxiliary')
         return type(default).__name__ if isinstance(default, planner.JaxPlanner) else 'None'
 
-    def _default_optimizer(self, state: FormState) -> Optional[str]:
-        default = _default_of(self._planner_class(state), 'optimizer')
-        return getattr(default, '__name__', default)
-
-    def _has_optimizer(self, state: FormState) -> bool:
-        return any(f.name == 'optimizer' for f in signature_fields(self._planner_class(state)))
-
     def _make_sections(self) -> List[Section]:
         default_compiler = _default_of(planner.JaxPlanner, 'compiler')
         compiler = Section(
@@ -140,12 +166,14 @@ class JaxPlanProvider(Provider):
             default_option=lambda state: getattr(default_compiler, '__name__', None))
         self._planner_section = planners = Section(
             'planner', '[Planner]', chooser='planner',
-            fields=lambda option, state: self._planner_fields(option),
+            fields=lambda option, state: with_optimizer_choices(
+                self._planner_fields(option), 'planner', option, state),
             options=lambda state: sorted(self.planners),
             default_option=lambda state: 'JaxBackpropPlanner')
         auxiliary = Section(
             'auxiliary', '[Planner] auxiliary planner', chooser='auxiliary',
-            fields=lambda option, state: self._auxiliary_fields(option),
+            fields=lambda option, state: with_optimizer_choices(
+                self._auxiliary_fields(option), 'auxiliary', option, state),
             options=lambda state: ['None'] + sorted(self.planners),
             default_option=self._default_auxiliary, scope=self._planner_scope)
         plans = Section(
@@ -153,15 +181,9 @@ class JaxPlanProvider(Provider):
             fields=lambda option, state: self._plan_fields(option),
             options=lambda state: sorted(self.plans),
             default_option=lambda state: 'JaxStraightLinePlan')
-        optimizer = Section(
-            'optimizer', '[Planner] optimizer', chooser='optimizer',
-            fields=lambda option, state: self._optimizer_fields(option, planners.option(state)),
-            options=lambda state: optax_optimizers(),
-            default_option=self._default_optimizer, scope=self._planner_scope,
-            visible=self._has_optimizer, required_when_used=True)
         optimize = Section(
             'optimize', '[Optimize]', fields=lambda option, state: self._optimize_fields())
-        return [planners, compiler, auxiliary, plans, optimizer, optimize]
+        return [planners, compiler, auxiliary, plans, optimize]
 
     def sections(self) -> List[Section]:
         return self._sections
@@ -179,20 +201,14 @@ class JaxPlanProvider(Provider):
         return FormState()
 
     def to_config(self, state: FormState) -> str:
-        compiler, planners, auxiliary, plans, optimizer = (
-            self.section(name) for name in ('compiler', 'planner', 'auxiliary', 'plan', 'optimizer'))
+        compiler, planners, auxiliary, plans = (
+            self.section(name) for name in ('compiler', 'planner', 'auxiliary', 'plan'))
         compiler_values = {'method': compiler.option(state), **self.changed(state, 'compiler')}
 
         planner_values = {'planner': planners.option(state), 'method': plans.option(state)}
         plan_kwargs = self.changed(state, 'plan')
         if plan_kwargs:
             planner_values['method_kwargs'] = plan_kwargs
-        if optimizer.visible(state):
-            optimizer_kwargs = self.changed(state, 'optimizer')
-            if optimizer.option(state) != self._default_optimizer(state) or optimizer_kwargs:
-                planner_values['optimizer'] = optimizer.option(state)
-            if optimizer_kwargs:
-                planner_values['optimizer_kwargs'] = optimizer_kwargs
         auxiliary_option = auxiliary.option(state)
         auxiliary_kwargs = self.changed(state, 'auxiliary')
         if auxiliary_option != self._default_auxiliary(state) or auxiliary_kwargs:
@@ -215,7 +231,6 @@ class JaxPlanProvider(Provider):
         for (section_id, values_of, key) in [('planner', planner_values, 'planner'),
                                              ('compiler', compiler_values, 'method'),
                                              ('plan', planner_values, 'method'),
-                                             ('optimizer', planner_values, 'optimizer'),
                                              ('auxiliary', planner_values, 'auxiliary')]:
             if key in values_of:
                 option = values_of.pop(key)
@@ -230,7 +245,6 @@ class JaxPlanProvider(Provider):
 
         assign(state, self.section('compiler'), compiler_values)
         assign(state, self.section('plan'), pop_dict('method_kwargs'))
-        assign(state, self.section('optimizer'), pop_dict('optimizer_kwargs'))
         assign(state, self.section('auxiliary'), pop_dict('auxiliary_kwargs'))
         assign(state, self.section('planner'), planner_values)
         assign(state, self.section('optimize'), values.get('Optimize', {}))
