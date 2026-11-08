@@ -1,5 +1,6 @@
-from tkinter import font
-from customtkinter import CTkTextbox, CTkScrollbar
+import tkinter
+from tkinter import TclError, font
+from customtkinter import AppearanceModeTracker, CTkTextbox, CTkScrollbar
 from pygments import token
 from pygments.styles import get_style_by_name
 import re
@@ -62,9 +63,16 @@ RDDL_GRAMMAR = [
 ]
         
 
+# a muted red behind the text, which stays legible in both themes, underlined in red
+ERROR_BACKGROUND = ('#ffdcdc', '#5a1d22')
+ERROR_UNDERLINE = ('#d00000', '#ff6b6b')
+ERROR_TAG = 'rddl_error'
+FONT_SIZE = 14
+
+
 class CTkCodeViewer(CTkTextbox):
 
-    def __init__(self, *args, width: int=100, height: int=32, 
+    def __init__(self, *args, width: int=100, height: int=32,
                  language='python', theme='monokai', **kwargs):
         super().__init__(*args, width=width, height=height, **kwargs)
         
@@ -77,7 +85,28 @@ class CTkCodeViewer(CTkTextbox):
         else:
             self.patterns = RDDL_GRAMMAR
         self.bind("<KeyRelease>", lambda *args: self.apply())
-        
+        self._style_error()
+
+    def _style_error(self):
+        self.tag_config(ERROR_TAG, background=self._apply_appearance_mode(ERROR_BACKGROUND),
+                        underline=True,
+                        underlinefg=self._apply_appearance_mode(ERROR_UNDERLINE))
+        self.tag_lower(ERROR_TAG, 'sel')  # a selection inside the error stays visible
+
+    def _set_appearance_mode(self, mode_string):
+        super()._set_appearance_mode(mode_string)
+        self._style_error()
+
+    def show_error(self, start, end):
+        '''Marks the source an error points to and scrolls it into view.'''
+        self.clear_error()
+        self.tag_add(ERROR_TAG, start, end)
+        self.see(end)
+        self.see(start)
+
+    def clear_error(self):
+        self.tag_remove(ERROR_TAG, '1.0', 'end')
+
     def apply(self):
         for (tag, pattern) in self.patterns:
             text = self.get('0.0', 'end').splitlines()
@@ -87,26 +116,68 @@ class CTkCodeViewer(CTkTextbox):
                         str(tag), f"{i + 1}.{found.start()}", f"{i + 1}.{found.end()}")
 
 
-class TextLineNumbers(CTkTextbox):
+class LineNumbers(tkinter.Canvas):
+    '''A gutter showing the number of each visible line of a code viewer at the height
+    of that line, redrawn whenever the view scrolls, the text changes or it resizes.'''
 
-    def __init__(self, master, text_widget, **kwargs):
-        super().__init__(master, activate_scrollbars=False, **kwargs)
- 
-        self.text_widget = text_widget
-        for tag in ['<KeyRelease>', '<FocusIn>', '<MouseWheel>', '<Configure>', '<<Modified>>']:
-            self.text_widget.bind(tag, self.on_key_release)
-        
-    def on_key_release(self, event=None):
-        p = int(self.text_widget.index("@0,0").split('.')[0])
-        final_index = str(self.text_widget.index('end'))
-        num_of_lines = int(final_index.split('.')[0])
-        line_numbers_string = "\n".join(str(p + no) for no in range(num_of_lines))
-                
-        self.configure(state='normal')
-        self.delete(0.0, 'end')
-        self.insert(0.0, line_numbers_string)
-        self.configure(state='disabled')
-            
+    PADDING = 8
+
+    def __init__(self, master, viewer: CTkTextbox):
+        super().__init__(master, highlightthickness=0, bd=0, width=1)
+        self.viewer = viewer
+        self.textbox = viewer._textbox
+        self._pending = False
+
+        # the text calls its yscrollcommand whenever its view changes, however scrolled
+        scrollbar_set = viewer._y_scrollbar.set
+
+        def scrolled(*args):
+            scrollbar_set(*args)
+            self.schedule()
+
+        self.textbox.configure(yscrollcommand=scrolled)
+        self.textbox.bind('<<Modified>>', self._modified, add='+')
+        self.textbox.bind('<Configure>', self.schedule, add='+')
+        self.bind('<Configure>', self.schedule, add='+')
+        self.bind('<MouseWheel>', lambda event: self.textbox.event_generate(
+            '<MouseWheel>', delta=event.delta))
+        AppearanceModeTracker.add(self.schedule, self)
+        self.bind('<Destroy>', lambda _: AppearanceModeTracker.remove(self.schedule), add='+')
+        self.schedule()
+
+    def _modified(self, _=None):
+        self.textbox.edit_modified(False)  # so that the next change is reported too
+        self.schedule()
+
+    def schedule(self, *_):
+        '''Redraws once the text has laid out its lines.'''
+        if not self._pending:
+            self._pending = True
+            self.after_idle(self.redraw)
+
+    def redraw(self):
+        self._pending = False
+        try:
+            color = self.viewer._apply_appearance_mode
+            text_font = font.Font(font=self.textbox.cget('font'))
+            last = int(self.textbox.index('end-1c').split('.')[0])
+            width = text_font.measure('0' * len(str(last))) + 2 * self.PADDING
+            self.configure(width=width, bg=color(self.viewer.cget('fg_color')))
+            self.delete('all')
+
+            # dlineinfo is relative to the text, which is inset in the viewer
+            top = self.textbox.winfo_rooty() - self.winfo_rooty()
+            first = int(self.textbox.index('@0,0').split('.')[0])
+            for line in range(first, last + 1):
+                info = self.textbox.dlineinfo(f'{line}.0')
+                if info is None:  # below the visible part
+                    break
+                self.create_text(width - self.PADDING, top + info[1], anchor='ne',
+                                 text=str(line), font=text_font,
+                                 fill=color(self.viewer.cget('text_color')))
+        except TclError:  # the editor was closed
+            pass
+
 
 class CodeEditor:
     
@@ -116,11 +187,10 @@ class CodeEditor:
         else:
             my_font = 'Courier'
         text_area = CTkCodeViewer(
-            window, font=(my_font, 16), language=language, theme=theme, wrap='none')
+            window, font=(my_font, FONT_SIZE), language=language, theme=theme, wrap='none')
         self.text = text_area
         
-        ln = TextLineNumbers(window, text_area, width=50, font=(my_font, 16))
-        ln.pack(side='left', fill='both')
+        LineNumbers(window, text_area).pack(side='left', fill='y')
         text_area.pack(expand=True, fill='both')        
         CTkScrollbar(window, command=text_area.xview)
         CTkScrollbar(window, command=text_area.yview)

@@ -1,56 +1,14 @@
 import os
 import sys
 import traceback
-from difflib import SequenceMatcher
 from tkinter import messagebox
 from customtkinter import CTkToplevel, CTkOptionMenu, StringVar, CTkLabel, CTkButton, CTkEntry
 from customtkinter import filedialog as fd
 from CTkMenuBar import CustomDropdownMenu
 
+from rddl_ide.core.errorlocation import locate_error
 from rddl_ide.core.execution import evaluate_policy
 from rddl_ide.core.settings.registry import PROVIDERS
-
-
-def closest_substring(corpus, query, case_sensitive=True):
-    step = min(4, max(1, len(query) * 3 // 4 - 1))
-    flex = max(1, len(query) // 3 - 1)
-    
-    def _match(a, b):
-        return SequenceMatcher(None, a, b).ratio()
-
-    def scan_corpus(step):
-        match_values, m = [], 0
-        while m + qlen - step <= len(corpus):
-            match_values.append(_match(query, corpus[m: m - 1 + qlen]))
-            m += step
-        return match_values
-
-    def adjust_left_right_positions():
-        p_l, bp_l = pos, pos
-        p_r, bp_r = pos + qlen, pos + qlen
-        bmv_l = bmv_r = match_values[p_l // step]
-        for f in range(flex):
-            ll = _match(query, corpus[p_l - f: p_r])
-            if ll > bmv_l:
-                bmv_l, bp_l = ll, p_l - f
-            lr = _match(query, corpus[p_l + f: p_r])
-            if lr > bmv_l:
-                bmv_l, bp_l = lr, p_l + f
-            rl = _match(query, corpus[p_l: p_r - f])
-            if rl > bmv_r:
-                bmv_r, bp_r = rl, p_r - f
-            rr = _match(query, corpus[p_l: p_r + f])
-            if rr > bmv_r:
-                bmv_r, bp_r = rr, p_r + f
-        return bp_l, bp_r
-
-    if not case_sensitive:
-        query, corpus = query.lower(), corpus.lower()
-    qlen = len(query)
-    if flex >= qlen / 2: flex = 3
-    match_values = scan_corpus(step)    
-    pos = max(range(len(match_values)), key=match_values.__getitem__) * step
-    return adjust_left_right_positions()
 
 
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
@@ -348,19 +306,21 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         save_domain()
         save_instance()
         if domain_file is not None and inst_file is not None:
-            domain_editor.tag_delete('showerror')
+            editors = {'domain': domain_editor, 'instance': inst_editor}
+            for editor in editors.values():
+                editor.clear_error()
             try:
                 build_policy, required_env_args = policy_pane.policy()
             except Exception as error:
                 _show_error('Policy error', error)
                 return
-            query = evaluate_policy(domain_file, inst_file, build_policy, required_env_args,
-                                    viz, record)
-            if query is not None:
-                corpus = domain_editor.get(1.0, 'end')
-                start, end = closest_substring(corpus, query)                
-                domain_editor.tag_add('showerror', f'1.0+{start}c', f'1.0+{end}c')
-                domain_editor.tag_config('showerror', background='yellow')
+            message = evaluate_policy(domain_file, inst_file, build_policy, required_env_args,
+                                      viz, record)
+            if message is not None:
+                location = locate_error(message, domain_editor.get('1.0', 'end'),
+                                        inst_editor.get('1.0', 'end'))
+                if location is not None:
+                    editors[location.source].show_error(location.start, location.end)
     
     def evaluate():
         _evaluate(None)
