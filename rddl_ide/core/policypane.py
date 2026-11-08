@@ -7,6 +7,7 @@ from customtkinter import CTkFrame, CTkLabel
 from rddl_ide.core.codearea import CodeEditor
 from rddl_ide.core.execution import policy_from_code
 from rddl_ide.core.form import SettingsForm
+from rddl_ide.core.paneheader import PaneHeader
 from rddl_ide.core.settings import registry
 
 
@@ -14,7 +15,7 @@ class PolicyPane(CTkFrame):
 
     def __init__(self, master):
         super().__init__(master, corner_radius=0)
-        self.header = CTkLabel(self, text='Policy', anchor='w', padx=10)
+        self.header = PaneHeader(self, 'Policy')
         self.header.pack(side='top', fill='x')
         self.code_frame = CTkFrame(self, corner_radius=0, fg_color='transparent')
         self.text = CodeEditor(self.code_frame, language='python').text

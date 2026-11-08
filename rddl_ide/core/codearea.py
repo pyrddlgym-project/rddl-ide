@@ -70,24 +70,29 @@ ERROR_TAG = 'rddl_error'
 FONT_SIZE = 14
 
 
+# pygments styles that color the code in the light and the dark theme
+SYNTAX_STYLES = ('default', 'monokai')
+
+
 class CTkCodeViewer(CTkTextbox):
 
     def __init__(self, *args, width: int=100, height: int=32,
-                 language='python', theme='monokai', **kwargs):
+                 language='python', theme=SYNTAX_STYLES, **kwargs):
         super().__init__(*args, width=width, height=height, **kwargs)
-        
-        style_parsed = get_style_by_name(theme).list_styles()
-        for key in style_parsed:
-            if key[1]["color"] != "" and key[1]["color"] != None:
-                self.tag_config(tagName=str(key[0]), foreground="#" + key[1]["color"])
+        self.styles = theme
         if language == 'python':
             self.patterns = PYTHON_GRAMMAR
         else:
             self.patterns = RDDL_GRAMMAR
-        self.bind("<KeyRelease>", lambda *args: self.apply())
-        self._style_error()
+        self.bind("<KeyRelease>", lambda *_: self.apply())
+        self._style_tags()
 
-    def _style_error(self):
+    def _style_tags(self):
+        '''Colors the syntax and error tags for the current theme.'''
+        style = get_style_by_name(self._apply_appearance_mode(self.styles))
+        for (tag, _) in self.patterns:
+            color = style.style_for_token(tag)['color']
+            self.tag_config(str(tag), foreground='#' + color if color else '')
         self.tag_config(ERROR_TAG, background=self._apply_appearance_mode(ERROR_BACKGROUND),
                         underline=True,
                         underlinefg=self._apply_appearance_mode(ERROR_UNDERLINE))
@@ -95,7 +100,7 @@ class CTkCodeViewer(CTkTextbox):
 
     def _set_appearance_mode(self, mode_string):
         super()._set_appearance_mode(mode_string)
-        self._style_error()
+        self._style_tags()
 
     def show_error(self, start, end):
         '''Marks the source an error points to and scrolls it into view.'''
@@ -181,7 +186,7 @@ class LineNumbers(tkinter.Canvas):
 
 class CodeEditor:
     
-    def __init__(self, window, language, theme='monokai'):
+    def __init__(self, window, language, theme=SYNTAX_STYLES):
         if 'Consolas' in font.names() or 'Consolas' in font.families():
             my_font = 'Consolas'
         else:

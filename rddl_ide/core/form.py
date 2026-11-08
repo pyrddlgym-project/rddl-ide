@@ -5,9 +5,10 @@ import tkinter
 from tkinter import BooleanVar, TclError, font
 
 from customtkinter import (
-    CTkButton, CTkCheckBox, CTkOptionMenu, CTkScrollableFrame, ThemeManager
+    CTkButton, CTkCheckBox, CTkFont, CTkScrollableFrame, ThemeManager
 )
 
+from rddl_ide.core.popup import ChoiceMenu
 from rddl_ide.core.settings.model import format_value, is_changed, parse_value
 
 CHANGED_COLOR = ('#a06800', '#e5c07b')
@@ -48,7 +49,8 @@ class _Entry(tkinter.Entry):
 class SettingsForm(CTkScrollableFrame):
 
     def __init__(self, master, provider, state, **kwargs):
-        super().__init__(master, corner_radius=0, **kwargs)
+        palette = ThemeManager.theme['Palette']
+        super().__init__(master, corner_radius=0, fg_color=palette['content'], **kwargs)
         self.provider = provider
         self.state = state
         self.open_sections = {provider.sections()[0].id}
@@ -109,11 +111,12 @@ class SettingsForm(CTkScrollableFrame):
             is_open = section.id in self.open_sections
             arrow = '▾' if is_open else '▸'
             CTkButton(content, text=f'{arrow}  {section.title}    ({len(fields)} settings)',
-                      anchor='w', corner_radius=0, fg_color=('gray81', 'gray20'),
-                      hover_color=('gray75', 'gray25'),
-                      text_color=ThemeManager.theme['CTkLabel']['text_color'],
+                      anchor='w', corner_radius=4, fg_color='transparent',
+                      hover_color=ThemeManager.theme['Palette']['hover'],
+                      text_color=ThemeManager.theme['Palette']['text'],
+                      font=CTkFont(weight='bold'),
                       command=lambda s=section.id: self.toggle(s)
-                      ).grid(row=row, column=0, sticky='ew', pady=(4, 0))
+                      ).grid(row=row, column=0, sticky='ew', padx=4, pady=(4, 0))
             row += 1
             if is_open:
                 body = tkinter.Frame(content, bg=self.background)
@@ -128,7 +131,7 @@ class SettingsForm(CTkScrollableFrame):
         row = 0
         if section.chooser is not None:
             self._name_label(body, row, section.chooser, False)
-            menu = CTkOptionMenu(body, values=section.options(self.state),
+            menu = ChoiceMenu(body, values=section.options(self.state),
                                  command=lambda value, s=section: self.choose(s, value))
             menu.set(option)
             menu.grid(row=row, column=1, sticky='w', pady=1)
@@ -185,7 +188,7 @@ class SettingsForm(CTkScrollableFrame):
                 self.state.set_text(section.id, option, path, value)
                 self.render()
 
-            menu = CTkOptionMenu(body, values=field.options, command=picked)
+            menu = ChoiceMenu(body, values=field.options, command=picked)
             menu.set(shown)
             menu.grid(row=row, column=1, sticky='w', pady=1)
 

@@ -2,12 +2,14 @@ import os
 import sys
 import traceback
 from tkinter import messagebox
-from customtkinter import CTkToplevel, CTkOptionMenu, StringVar, CTkLabel, CTkButton, CTkEntry
+from customtkinter import CTkToplevel, StringVar, CTkLabel, CTkButton, CTkEntry
+from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
-from CTkMenuBar import CustomDropdownMenu
 
+from rddl_ide.core.appicon import set_icon
 from rddl_ide.core.errorlocation import locate_error
 from rddl_ide.core.execution import evaluate_policy
+from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
 
 
@@ -69,8 +71,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
         def __init__(self, *args, **kwargs):
             super(ToplevelWindow, self).__init__(*args, **kwargs)
-            pkg_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            self.after(250, lambda: self.iconbitmap(os.path.join(pkg_path, 'icon.ico')))
+            self.after(250, lambda: set_icon(self))  # after CTkToplevel sets its own
         
     def open_from_dialog():
         nonlocal domain_file, inst_file, viz
@@ -94,21 +95,21 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         context_var = StringVar(master)
         context_var.set(context_options[0])
         context_var.trace_add('write', changed_context)
-        context_dropdown = CTkOptionMenu(
+        context_dropdown = ChoiceMenu(
             master, variable=context_var, values=context_options)
         
         domain_options = manager.list_problems()
         domain_var = StringVar(master)
         domain_var.set(domain_options[0])
         domain_var.trace_add('write', changed_domain)
-        domain_dropdown = CTkOptionMenu(
+        domain_dropdown = ChoiceMenu(
             master, variable=domain_var, values=domain_options)
         
         problem_info = manager.get_problem(domain_options[0])
         instance_options = problem_info.list_instances()
         instance_var = StringVar(master)
         instance_var.set(instance_options[0])
-        instance_dropdown = CTkOptionMenu(
+        instance_dropdown = ChoiceMenu(
             master, variable=instance_var, values=instance_options)
         
         CTkLabel(master, text="Context").grid(row=0)
@@ -221,13 +222,13 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         context_var = StringVar(master)
         context_var.set(context_options[0])
         context_var.trace_add('write', changed_context)
-        context_dropdown = CTkOptionMenu(
+        context_dropdown = ChoiceMenu(
             master, variable=context_var, values=context_options)
         
         domain_options = manager.list_problems()
         domain_var = StringVar(master)
         domain_var.set(domain_options[0])
-        domain_dropdown = CTkOptionMenu(
+        domain_dropdown = ChoiceMenu(
             master, variable=domain_var, values=domain_options)
         
         CTkLabel(master, text="Context").grid(row=0)
@@ -332,7 +333,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         
     # domain menu
     domain_menu_file = menu.add_cascade("Domain")
-    domain_menu_file_drop = CustomDropdownMenu(widget=domain_menu_file, font=("Roboto", 14))
+    domain_menu_file_drop = MenuBarMenu(domain_menu_file)
     domain_menu_file_drop.add_option(option='New Domain', command=create_domain)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(option='Load Domain from rddlrepository...', command=open_from_dialog)
@@ -347,7 +348,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     # instance menu
     inst_menu_file = menu.add_cascade("Instance")
-    inst_menu_file_drop = CustomDropdownMenu(widget=inst_menu_file, font=("Roboto", 14))
+    inst_menu_file_drop = MenuBarMenu(inst_menu_file)
     inst_menu_file_drop.add_option(option='New Instance', command=create_instance)
     inst_menu_file_drop.add_separator()
     inst_menu_file_drop.add_option(option='Load Instance from File...', command=open_instance)
@@ -359,14 +360,14 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     # edit menu, for the editor that last had the focus
     edit_menu = menu.add_cascade("Edit")
-    edit_menu_drop = CustomDropdownMenu(widget=edit_menu, font=("Roboto", 14))
+    edit_menu_drop = MenuBarMenu(edit_menu)
     edit_menu_drop.add_option(option='Copy', command=copy_text)
     edit_menu_drop.add_option(option='Cut', command=cut_text)
     edit_menu_drop.add_option(option='Paste', command=paste_text)
 
     # agent menu: the policy file, the built-in baselines, and running the policy
     agent_menu = menu.add_cascade("Agent")
-    agent_menu_drop = CustomDropdownMenu(widget=agent_menu, font=("Roboto", 14))
+    agent_menu_drop = MenuBarMenu(agent_menu)
     agent_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
     agent_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
     agent_menu_drop.add_separator()
@@ -376,3 +377,11 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     agent_menu_drop.add_separator()
     agent_menu_drop.add_option(option='Evaluate', command=evaluate)
     agent_menu_drop.add_option(option='Record', command=record)
+
+    # view menu
+    def toggle_theme():
+        set_appearance_mode('light' if get_appearance_mode() == 'Dark' else 'dark')
+
+    view_menu = menu.add_cascade("View")
+    view_menu_drop = MenuBarMenu(view_menu)
+    view_menu_drop.add_option(option='Toggle Light/Dark Theme', command=toggle_theme)
