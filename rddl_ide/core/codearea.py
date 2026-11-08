@@ -184,13 +184,22 @@ class LineNumbers(tkinter.Canvas):
             pass
 
 
+# monospace fonts in order of preference: Windows, macOS, then common Linux fonts
+MONOSPACE_FAMILIES = ('Consolas', 'Menlo', 'SF Mono', 'DejaVu Sans Mono', 'Liberation Mono',
+                      'Ubuntu Mono', 'Noto Sans Mono', 'Courier New')
+
+
+def monospace_family() -> str:
+    '''The first installed font of MONOSPACE_FAMILIES, else Courier, which Tk maps to a
+    monospace font on every platform.'''
+    installed = set(font.families())
+    return next((family for family in MONOSPACE_FAMILIES if family in installed), 'Courier')
+
+
 class CodeEditor:
     
     def __init__(self, window, language, theme=SYNTAX_STYLES):
-        if 'Consolas' in font.names() or 'Consolas' in font.families():
-            my_font = 'Consolas'
-        else:
-            my_font = 'Courier'
+        my_font = monospace_family()
         text_area = CTkCodeViewer(
             window, font=(my_font, FONT_SIZE), language=language, theme=theme, wrap='none')
         self.text = text_area

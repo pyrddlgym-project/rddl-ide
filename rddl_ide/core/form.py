@@ -8,6 +8,7 @@ from customtkinter import (
     CTkButton, CTkCheckBox, CTkFont, CTkScrollableFrame, ThemeManager
 )
 
+from rddl_ide.core.codearea import monospace_family
 from rddl_ide.core.popup import ChoiceMenu
 from rddl_ide.core.settings.model import format_value, is_changed, parse_value
 
@@ -55,7 +56,7 @@ class SettingsForm(CTkScrollableFrame):
         self.state = state
         self.open_sections = {provider.sections()[0].id}
         self.only_changed = BooleanVar(value=False)
-        self.family = 'Consolas' if 'Consolas' in font.families() else 'Courier'
+        self.family = monospace_family()
         self.columnconfigure(0, weight=1)
         self.render()
 

@@ -382,9 +382,9 @@ class ChoiceMenu(CTkOptionMenu):
     '''A CTkOptionMenu whose list opens as a PopupMenu.'''
 
     def _open_dropdown_menu(self):
-        PopupMenu(self, [(value, lambda value=value: self._dropdown_callback(value))
-                         for value in self._values],
-                  selected=self._current_value, min_width=self.winfo_width())
+        self.popup = PopupMenu(self, [(value, lambda value=value: self._dropdown_callback(value))
+                                      for value in self._values],
+                               selected=self._current_value, min_width=self.winfo_width())
 
 
 class MenuBarMenu:

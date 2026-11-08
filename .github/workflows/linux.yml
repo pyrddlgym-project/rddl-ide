@@ -1,25 +1,30 @@
-name: Linux
+name: Linux screenshots
 
+# shows how the IDE renders on Linux: the screenshots are attached to the run as the
+# linux-screenshots artifact (at the bottom of the run's page)
 on:
   push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
-  test:
+  screenshots:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install a virtual display and Tk
-        run: sudo apt-get update && sudo apt-get install -y xvfb python3-tk
+          python-version: "3.12"
+      - name: Install a virtual display
+        run: sudo apt-get update && sudo apt-get install -y xvfb imagemagick
       - name: Install rddl-ide
-        run: pip install -e . pillow
-      - name: Run the tests, the GUI smoke test on a virtual display
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" python -m unittest discover -s tests -t . -v
+        run: pip install -e . pillow rddlrepository
+      - name: Install JaxPlan, for its form
+        continue-on-error: true
+        run: pip install pyRDDLGym-jax
+      - name: Take the screenshots
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" python .github/screenshots.py screenshots
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: linux-screenshots
+          path: screenshots

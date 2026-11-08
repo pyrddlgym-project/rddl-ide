@@ -64,7 +64,11 @@ def create_window():
         color = window._apply_appearance_mode(ThemeManager.theme['CTk']['fg_color'])
         for paned in (panes, right_panes):
             paned.configure(bg=color)
-    AppearanceModeTracker.add(lambda _: window.after_idle(color_dividers), window)
+    def recolor(_):
+        window.after_idle(color_dividers)
+    AppearanceModeTracker.add(recolor, window)
+    window.bind('<Destroy>', lambda event: event.widget is window and
+                AppearanceModeTracker.remove(recolor), add='+')
 
     # size the panes once the window has been maximized
     def place_dividers():
