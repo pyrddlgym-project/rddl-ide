@@ -2,11 +2,11 @@ import os
 import sys
 import traceback
 from tkinter import messagebox
-from customtkinter import CTkToplevel, StringVar, CTkLabel, CTkButton, CTkEntry
+from customtkinter import StringVar, CTkEntry
 from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
-from rddl_ide.core.appicon import set_icon
+from rddl_ide.core.dialog import Dialog
 from rddl_ide.core.errorlocation import locate_error
 from rddl_ide.core.execution import evaluate_policy
 from rddl_ide.core.icons import RECORD_COLOR, IconButton
@@ -62,15 +62,10 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)
     
     
-    class ToplevelWindow(CTkToplevel):
-    
-        def __init__(self, *args, **kwargs):
-            super(ToplevelWindow, self).__init__(*args, **kwargs)
-            self.after(250, lambda: set_icon(self))  # after CTkToplevel sets its own
-        
     def open_from_dialog():
         nonlocal domain_file, inst_file, viz
-        master = ToplevelWindow(root)
+        dialog = Dialog(root, 'Load from rddlrepository')
+        master = dialog.body
         
         def changed_context(*args):
             domain_options = manager.list_problems_by_context(context_var.get())
@@ -107,19 +102,13 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         instance_dropdown = ChoiceMenu(
             master, variable=instance_var, values=instance_options)
         
-        CTkLabel(master, text="Context").grid(row=0)
-        CTkLabel(master, text="Domain").grid(row=1)
-        CTkLabel(master, text="Instance").grid(row=2)
-        e0 = context_dropdown
-        e1 = domain_dropdown
-        e2 = instance_dropdown
-        e0.grid(row=0, column=1)
-        e1.grid(row=1, column=1)
-        e2.grid(row=2, column=1)
-        
+        dialog.field('Context', context_dropdown)
+        dialog.field('Domain', domain_dropdown)
+        dialog.field('Instance', instance_dropdown)
+
         def close_me():
-            master.destroy()   
-            
+            dialog.destroy()
+
         def select_problem():
             nonlocal domain_file, inst_file, viz
             domain, instance = domain_var.get(), instance_var.get()
@@ -134,10 +123,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             close_me()
             domain_file, inst_file = None, None
         
-        CTkButton(master, text='Load', command=select_problem).grid(
-            row=3, column=0, sticky='w', pady=4)
-        CTkButton(master, text='Close', command=close_me).grid(
-            row=3, column=1, sticky='w', pady=4)
+        dialog.buttons('Load', select_problem)
     
     def _pane_to_file(window, editor, caption, file_path):
         if file_path is not None: 
@@ -189,22 +175,19 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         if active_run is not None:
             active_run.stop()
 
-    run_state = []  # called with whether a run is going on, when that changes
+    buttons_changed = []  # called when the buttons enabled may have changed
 
     root.protocol('WM_DELETE_WINDOW', exit_application)
     
-    def register_domain():        
-        master = ToplevelWindow(root)
-        CTkLabel(master, text="Context").grid(row=0)
-        CTkLabel(master, text="Domain Name").grid(row=1)
-        e1 = CTkEntry(master)
-        e2 = CTkEntry(master)
-        e1.grid(row=0, column=1)
-        e2.grid(row=1, column=1)
-        
+    def register_domain():
+        dialog = Dialog(root, 'Register domain in rddlrepository')
+        e1 = dialog.field('Context', CTkEntry(dialog.body))
+        e2 = dialog.field('Domain name', CTkEntry(dialog.body))
+
         def close_me():
-            master.destroy()   
-            
+            dialog.destroy()
+
+
         def save_domain():
             from rddlrepository.core.manager import RDDLRepoManager
             manager = RDDLRepoManager()
@@ -213,13 +196,11 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             manager.register_domain(e2.get(), e1.get(), domain_editor.get(1.0, 'end'))
             close_me()
             
-        CTkButton(master, text='Register', command=save_domain).grid(
-            row=2, column=0, sticky='w', pady=4)
-        CTkButton(master, text='Close', command=close_me).grid(
-            row=2, column=1, sticky='w', pady=4)
+        dialog.buttons('Register', save_domain)
     
     def register_instance():
-        master = ToplevelWindow(root)
+        dialog = Dialog(root, 'Register instance in rddlrepository')
+        master = dialog.body
         
         from rddlrepository.core.manager import RDDLRepoManager
         manager = RDDLRepoManager() 
@@ -242,28 +223,19 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         domain_dropdown = ChoiceMenu(
             master, variable=domain_var, values=domain_options)
         
-        CTkLabel(master, text="Context").grid(row=0)
-        CTkLabel(master, text="Domain").grid(row=1)
-        CTkLabel(master, text="Instance").grid(row=2)
-        e0 = context_dropdown
-        e1 = domain_dropdown
-        e2 = CTkEntry(master)
-        e0.grid(row=0, column=1)
-        e1.grid(row=1, column=1)
-        e2.grid(row=2, column=1)
-        
+        dialog.field('Context', context_dropdown)
+        dialog.field('Domain', domain_dropdown)
+        e2 = dialog.field('Instance name', CTkEntry(master))
+
         def close_me():
-            master.destroy()   
+            dialog.destroy()
         
         def save_instance():
             problem_info = manager.get_problem(domain_var.get())
             problem_info.register_instance(e2.get(), inst_editor.get(1.0, 'end'))
             close_me()
         
-        CTkButton(master, text='Register', command=save_instance).grid(
-            row=3, column=0, sticky='w', pady=4)
-        CTkButton(master, text='Close', command=close_me).grid(
-            row=3, column=1, sticky='w', pady=4)
+        dialog.buttons('Register', save_instance)
         
     # EDIT functions act on whichever editor last had the keyboard focus
     last_focused = [domain_editor]
@@ -320,9 +292,40 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
     policy_pane.show_form('builtin')
 
+    # trained WEIGHTS, of the baselines that have them, e.g. JaxPlan (offline)
+    trained = None  # (provider, policy) of the last run that trained weights
+
+    def load_weights():
+        provider = policy_pane.provider
+        if provider is None or provider.weight_files is None:
+            messagebox.showinfo('Load Weights', 'The selected policy has no weights to '
+                                                'load. JaxPlan (offline) has.')
+            return
+        path = fd.askopenfilename(filetypes=provider.weight_files)
+        if path:
+            provider.load_weights(policy_pane.state, path)
+            policy_pane.body.render()  # shows the setting it changed
+            status_bar.show(f'Loaded {os.path.basename(path)}: the next run uses these '
+                            f'weights instead of training')
+
+    def save_weights():
+        if trained is None:
+            messagebox.showinfo('Save Trained Weights', 'No weights were trained yet: '
+                                'evaluate a JaxPlan (offline) policy first.')
+            return
+        (provider, policy) = trained
+        path = fd.asksaveasfilename(initialfile='weights.pickle', defaultextension='.pickle',
+                                    filetypes=provider.weight_files)
+        if path:
+            try:
+                provider.save_weights(policy, path)
+                status_bar.show(f'Saved the trained weights to {os.path.basename(path)}')
+            except Exception as error:
+                _show_error('Could not save weights', error)
+
     # policy RUN functions
     def _evaluate(record):
-        nonlocal domain_file, inst_file, viz, active_run
+        nonlocal domain_file, inst_file, viz, active_run, trained
         if active_run is not None:
             return
         save_domain()
@@ -337,16 +340,20 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             except Exception as error:
                 _show_error('Policy error', error)
                 return
+            provider = policy_pane.provider  # the form can change during the run
             active_run = progress
-            for show in run_state:
-                show(True)
+            for update in buttons_changed:
+                update()
             try:
                 message = evaluate_policy(domain_file, inst_file, build_policy,
                                           required_env_args, viz, record, progress)
             finally:
                 active_run = None
-                for show in run_state:
-                    show(False)
+                if progress.policy is not None and provider is not None and \
+                        provider.weight_files is not None:
+                    trained = (provider, progress.policy)
+                for update in buttons_changed:
+                    update()
             if close_after_run:
                 root.destroy()
                 return
@@ -409,6 +416,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     agent_menu_drop = MenuBarMenu(agent_menu)
     agent_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
     agent_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
+    agent_menu_drop.add_option(option='Load Weights...', command=load_weights)
+    agent_menu_drop.add_option(option='Save Trained Weights...', command=save_weights)
     agent_menu_drop.add_separator()
     for (kind, title, _) in PROVIDERS:
         agent_menu_drop.add_option(
@@ -447,13 +456,25 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     policy_header.add_button('load', 'Load policy from file', load_policy_from_file)
     policy_header.add_button('save', 'Save policy as', save_policy_as)
     policy_header.add_gap()
+    load_weights_button = policy_header.add_button(
+        'load_weights', 'Load trained weights', load_weights)
+    save_weights_button = policy_header.add_button(
+        'save_weights', 'Save trained weights', save_weights)
+    policy_header.add_gap()
     run_buttons = [policy_header.add_button('run', 'Evaluate', evaluate),
                    policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)]
     stop_button = policy_header.add_button('stop', 'Stop', stop_run)
-    stop_button.set_enabled(False)
 
-    def show_running(running):
+    def update_buttons():
+        running = active_run is not None
         for button in run_buttons:
             button.set_enabled(not running)
         stop_button.set_enabled(running)
-    run_state.append(show_running)
+        provider = policy_pane.provider
+        load_weights_button.set_enabled(
+            not running and provider is not None and provider.weight_files is not None)
+        save_weights_button.set_enabled(not running and trained is not None)
+
+    buttons_changed.append(update_buttons)
+    policy_pane.changed.append(update_buttons)
+    update_buttons()

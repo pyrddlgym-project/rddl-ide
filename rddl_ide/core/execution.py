@@ -54,7 +54,7 @@ def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz
             if record is not None:
                 movie_gen = MovieGenerator(record, env.model.domain_name, 9999)
             env.set_visualizer(viz, movie_gen=movie_gen)
-            policy = build_policy(env)
+            policy = progress.policy = build_policy(env)
             episode = _Episode(env, progress)
             policy.evaluate(env, episodes=1, verbose=True, render=True)
             env.close()

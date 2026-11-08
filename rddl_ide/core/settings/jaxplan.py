@@ -3,6 +3,7 @@ import dataclasses
 import functools
 import inspect
 import os
+import pickle
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -11,7 +12,7 @@ import pyRDDLGym_jax
 from pyRDDLGym_jax.core import config, controller, logic, plan, planner
 
 from rddl_ide.core.settings.introspect import concrete_subclasses, signature_fields
-from rddl_ide.core.settings.model import Field, FormState, Section
+from rddl_ide.core.settings.model import Field, FormState, Section, format_value
 from rddl_ide.core.settings.provider import (
     Provider, assign, fields_with_traced_kwargs, read_config, write_config
 )
@@ -23,6 +24,9 @@ NOT_CONFIGURABLE_PLANNER = {'rddl', 'plan', 'compiler', 'compiler_kwargs', 'logg
                             'dashboard_viz', 'python_functions', 'critic'}
 NOT_CONFIGURABLE_OPTIMIZE = {'subs', 'guess', 'model_params', 'critic_params',
                              'dashboard_id', 'tqdm_position', 'planner'}
+
+# the trained weights of an offline controller, as its save_path setting writes them
+WEIGHT_FILES = [('JaxPlan weights', '*.pickle *.pkl'), ('All files', '*.*')]
 
 # settings of the planner shown in sections of their own
 PLANNER_CHOICES = {'auxiliary'}
@@ -103,6 +107,7 @@ class JaxPlanProvider(Provider):
         self.title = 'JaxPlan (online)' if online else 'JaxPlan (offline)'
         self.controller = controller.JaxOnlineController if online \
             else controller.JaxOfflineController
+        self.weight_files = None if online else WEIGHT_FILES  # online replans each step
         self.planners = concrete_subclasses(planner, planner.JaxPlanner)
         self.plans = concrete_subclasses(plan, plan.JaxPlan)
         self.compilers = {name: obj for (name, obj) in vars(logic).items()
@@ -269,6 +274,18 @@ class JaxPlanProvider(Provider):
             online = self.controller is controller.JaxOnlineController
             _report_training(jax_planner, progress, 'Planning' if online else 'Training')
         return self.controller(jax_planner, **train_args)
+
+
+    def save_weights(self, policy, path: str) -> None:
+        '''Writes the file JaxOfflineController(save_path=path) writes after training,
+        which its params setting loads.'''
+        contents = {'params': policy.params, 'hyperparams': policy.eval_hyperparams}
+        with open(path, 'wb') as file:
+            pickle.dump(contents, file)
+
+    def load_weights(self, state: FormState, path: str) -> None:
+        section = self.section('optimize')
+        state.set_text(section.id, section.option(state), 'params', format_value(path))
 
 
 def _report_training(jax_planner, progress, caption: str) -> None:

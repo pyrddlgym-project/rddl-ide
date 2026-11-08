@@ -22,6 +22,11 @@ class PolicyPane(CTkFrame):
         self.body = None
         self.mode = None  # 'code', 'form' or 'unavailable'
         self.provider = self.state = None
+        self.changed = []  # called when the policy shown changes
+
+    def _changed(self):
+        for callback in self.changed:
+            callback()
 
     def title(self, text):
         self.header.configure(text=text)
@@ -39,6 +44,7 @@ class PolicyPane(CTkFrame):
         self.text.set_text(source)
         self.code_frame.pack(fill='both', expand=True)
         self.title(f'Policy: {caption}')
+        self._changed()
 
     def show_form(self, kind, provider=None, state=None):
         self._clear()
@@ -52,11 +58,13 @@ class PolicyPane(CTkFrame):
                                             f'{type(error).__name__}: {error}',
                                  justify='left', anchor='nw', wraplength=500)
             self.body.pack(fill='both', expand=True, padx=12, pady=12)
+            self._changed()
             return
         self.mode = 'form'
         self.provider, self.state = provider, state
         self.body = SettingsForm(self, provider, state)
         self.body.pack(fill='both', expand=True)
+        self._changed()
 
     # ===========================================================================
     # files

@@ -28,27 +28,27 @@
     ]
   },
   "CTkButton": {
-    "corner_radius": 6,
+    "corner_radius": 4,
     "border_width": 0,
     "fg_color": [
-      "#2F6FEB",
-      "#3574F0"
+      "#EEF0F3",
+      "#2F3236"
     ],
     "hover_color": [
-      "#255BC7",
-      "#2E64D0"
+      "#E3E6EA",
+      "#3A3D42"
     ],
     "border_color": [
-      "#3E454A",
-      "#949A9F"
+      "#D0D4DA",
+      "#474A50"
     ],
     "text_color": [
-      "#FFFFFF",
-      "#FFFFFF"
+      "#1F2328",
+      "#DFE1E5"
     ],
     "text_color_disabled": [
-      "gray74",
-      "gray60"
+      "#6B717A",
+      "#8C9099"
     ]
   },
   "CTkLabel": {

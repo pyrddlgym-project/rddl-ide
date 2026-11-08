@@ -94,6 +94,7 @@ class Provider:
 
     kind = ''
     title = ''
+    weight_files = None  # file types of the trained weights it saves and loads, if any
 
     def sections(self) -> List[Section]:
         raise NotImplementedError
@@ -113,6 +114,14 @@ class Provider:
     def build_policy(self, env, state: FormState, progress=None):
         '''Builds the policy for env, reporting its training (if any) to progress, a
         RunProgress, if given.'''
+        raise NotImplementedError
+
+    def save_weights(self, policy, path: str) -> None:
+        '''Saves the trained weights of a policy it built.'''
+        raise NotImplementedError
+
+    def load_weights(self, state: FormState, path: str) -> None:
+        '''Sets the form to use the saved weights instead of training.'''
         raise NotImplementedError
 
     def section(self, section_id: str) -> Section:

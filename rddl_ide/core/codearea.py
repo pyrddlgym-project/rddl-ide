@@ -182,9 +182,12 @@ class LineNumbers(tkinter.Canvas):
         self._pending = False
         try:
             color = self.viewer._apply_appearance_mode
-            text_font = font.Font(font=self.textbox.cget('font'))
+            # the text's own font description, sized in pixels: a font.Font copy of it
+            # would be sized in points, which grow if Tk's DPI setting changes later
+            text_font = self.textbox.cget('font')
             last = int(self.textbox.index('end-1c').split('.')[0])
-            width = text_font.measure('0' * len(str(last))) + 2 * self.PADDING
+            digits_width = int(self.tk.call('font', 'measure', text_font, '0' * len(str(last))))
+            width = digits_width + 2 * self.PADDING
             self.configure(width=width, bg=color(self.viewer.cget('fg_color')))
             self.delete('all')
 

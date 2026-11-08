@@ -48,6 +48,7 @@ class RunProgress:
         self._describe: Optional[Callable[[], str]] = None
         self._shown_at = 0.0
         self.stopped = False
+        self.policy = None  # once built
 
     def stop(self) -> None:
         '''Ends the run at its next progress report.'''

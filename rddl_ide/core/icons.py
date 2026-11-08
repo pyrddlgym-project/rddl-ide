@@ -127,6 +127,22 @@ def _save_as(pen):  # the floppy with a pencil over its corner
              radius=0.5)
 
 
+def _tray(pen):
+    pen.line((3, 15), (3, 20.5), (21, 20.5), (21, 15), radius=1.5)
+
+
+def _load_weights(pen):  # an arrow into a tray
+    _tray(pen)
+    pen.line((12, 3), (12, 15))
+    pen.line((7.5, 10.5), (12, 15), (16.5, 10.5))
+
+
+def _save_weights(pen):  # an arrow out of a tray
+    _tray(pen)
+    pen.line((12, 15), (12, 3))
+    pen.line((7.5, 7.5), (12, 3), (16.5, 7.5))
+
+
 def _run(pen):
     pen.polygon((7.5, 5), (18.5, 12), (7.5, 19), radius=1.5)
 
@@ -159,7 +175,8 @@ def _sun(pen):
         pen.line((12 + 7.5 * dx, 12 + 7.5 * dy), (12 + 9.5 * dx, 12 + 9.5 * dy))
 
 
-DRAWINGS = {'new': _new, 'load': _load, 'save': _save, 'save_as': _save_as, 'run': _run,
+DRAWINGS = {'new': _new, 'load': _load, 'save': _save, 'save_as': _save_as,
+            'load_weights': _load_weights, 'save_weights': _save_weights, 'run': _run,
             'record': _record, 'stop': _stop, 'moon': _moon, 'sun': _sun}
 
 
