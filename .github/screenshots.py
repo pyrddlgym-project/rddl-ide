@@ -4,13 +4,15 @@ error marked, an open menu, the JaxPlan form and an open chooser.
 
     python .github/screenshots.py <output folder>'''
 import os
+import platform
 import subprocess
 import sys
 import time
 import warnings
 
-from customtkinter import set_appearance_mode
+from customtkinter import CTkFont, set_appearance_mode
 
+from rddl_ide.core.codearea import monospace_family
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.run import create_window
 
@@ -67,6 +69,25 @@ def capture(window, path):
     print('saved', path)
 
 
+def describe(window, domain, path):
+    '''Writes where the screenshots were taken: the platform, Tk, the screen and the
+    fonts the IDE actually uses there.'''
+    from tkinter import font
+    editor_font = font.Font(font=domain.editor.text._textbox.cget('font'))
+    lines = [f'platform: {platform.platform()}',
+             f'python: {sys.version.split()[0]}, Tk: {window.tk.call("info", "patchlevel")}',
+             f'screen: {window.winfo_screenwidth()}x{window.winfo_screenheight()}, '
+             f'scaling: {window._get_window_scaling()}',
+             f'editor font: {editor_font.actual("family")} {editor_font.actual("size")}',
+             f'monospace font chosen: {monospace_family()}',
+             f'UI font: {font.Font(font=CTkFont()).actual("family")}']
+    with open(path, 'w') as file:
+        file.write('\n'.join(lines) + '\n')
+    print('\n'.join(lines))
+    if os.environ.get('GITHUB_ACTIONS'):  # also on the run's page, readable without signing in
+        print('::notice title=Where the screenshots were taken::' + '%0A'.join(lines))
+
+
 def main(folder):
     warnings.filterwarnings('ignore')
     os.makedirs(folder, exist_ok=True)
@@ -82,6 +103,7 @@ def main(folder):
     line = next((i for (i, text) in enumerate(lines, 1) if "'" in text and '=' in text), 1)
     domain.editor.text.show_error(f'{line}.0', f'{line}.end')
     agent = next(menu for menu in MenuBarMenu._menus if menu.button.cget('text') == 'Agent')
+    describe(window, domain, os.path.join(folder, 'info.txt'))
 
     for theme in ('light', 'dark'):
         set_appearance_mode(theme)
