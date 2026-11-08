@@ -9,6 +9,8 @@ from rddl_ide.core.execution import policy_from_code
 from rddl_ide.core.form import SettingsForm
 from rddl_ide.core.paneheader import PaneHeader
 from rddl_ide.core.settings import registry
+from rddl_ide.core import textfile
+from rddl_ide.core.textfile import FileFormat
 
 
 class PolicyPane(CTkFrame):
@@ -38,10 +40,10 @@ class PolicyPane(CTkFrame):
         self.code_frame.pack_forget()
         self.provider = self.state = None
 
-    def show_code(self, source, caption):
+    def show_code(self, source, caption, file_format=FileFormat()):
         self._clear()
         self.mode = 'code'
-        self.text.set_text(source)
+        self.text.set_text(source, file_format)
         self.code_frame.pack(fill='both', expand=True)
         self.title(f'Policy: {caption}')
         self._changed()
@@ -76,18 +78,17 @@ class PolicyPane(CTkFrame):
     def save(self, path):
         if self.mode == 'form':
             content = self.provider.to_config(self.state)
+            textfile.write(path, content, FileFormat())
         elif self.mode == 'code':
-            content = self.text.get('1.0', 'end')
+            self.text.file_format = textfile.write(path, self.text.content(),
+                                                   self.text.file_format)
         else:
             raise RuntimeError('There is no policy to save.')
-        with open(path, 'w') as file:
-            file.write(content)
 
     def load(self, path):
-        with open(path, 'r') as file:
-            content = file.read()
+        (content, file_format) = textfile.read(path)
         if not path.lower().endswith('.cfg'):
-            self.show_code(content, os.path.basename(path))
+            self.show_code(content, os.path.basename(path), file_format)
             return
         kind = registry.detect_kind(content)
         if kind is None:

@@ -13,6 +13,7 @@ from rddl_ide.core.icons import RECORD_COLOR, IconButton
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
 from rddl_ide.core.statusbar import RunProgress
+from rddl_ide.core import textfile
 
 
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
@@ -22,9 +23,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     # load template RDDL
     abs_path = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(abs_path, 'prefab', 'domain.rddl'), 'r') as dom_txt:
+    with open(os.path.join(abs_path, 'prefab', 'domain.rddl'), encoding='utf-8') as dom_txt:
         DOMAIN_TEMPLATE = dom_txt.read()
-    with open(os.path.join(abs_path, 'prefab', 'instance.rddl'), 'r') as inst_txt:
+    with open(os.path.join(abs_path, 'prefab', 'instance.rddl'), encoding='utf-8') as inst_txt:
         INSTANCE_TEMPLATE = inst_txt.read()
     
     # FILE functions
@@ -43,8 +44,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     def _pane_from_file(window, editor, caption, file_path):
         if file_path is not None:
             window.title(f'{caption}: {os.path.basename(file_path)}')
-            with open(file_path, 'r') as new_file:
-                editor.set_text(new_file.read())
+            editor.set_text(*textfile.read(file_path))
         
     def open_domain():
         nonlocal domain_file, viz    
@@ -127,9 +127,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     def _pane_to_file(window, editor, caption, file_path):
         if file_path is not None: 
-            with open(file_path, 'w') as new_file:
-                new_file.write(editor.get(1.0, 'end'))
-                new_file.close()
+            editor.file_format = textfile.write(file_path, editor.content(),
+                                                editor.file_format)
+            status_bar.update_position()
             window.title(f'{caption}: {os.path.basename(file_path)}')
     
     def save_domain():
@@ -232,7 +232,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         
         def save_instance():
             problem_info = manager.get_problem(domain_var.get())
-            problem_info.register_instance(e2.get(), inst_editor.get(1.0, 'end'))
+            problem_info.register_instance(e2.get(), inst_editor.content())
             close_me()
         
         dialog.buttons('Register', save_instance)
@@ -241,6 +241,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     last_focused = [domain_editor]
     for editor in (domain_editor, inst_editor, policy_editor):
         editor.bind('<FocusIn>', lambda _, e=editor: last_focused.__setitem__(0, e), add='+')
+        status_bar.track(editor)
+    policy_pane.changed.append(status_bar.update_position)  # e.g. the code was hidden
 
     def _edit_event(event):
         editor = last_focused[0]

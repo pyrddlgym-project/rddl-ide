@@ -5,6 +5,7 @@ from typing import Callable
 from customtkinter import CTkButton, CTkFrame, CTkLabel, CTkToplevel, ThemeManager
 
 from rddl_ide.core.appicon import set_icon
+from rddl_ide.core.titlebar import match_title_bar
 
 FIELD_WIDTH = 280
 BUTTON_WIDTH = 90
@@ -21,6 +22,7 @@ class Dialog(CTkToplevel):
         self.resizable(False, False)
         self.transient(master)
         self.after(250, lambda: set_icon(self))  # after CTkToplevel sets its own
+        match_title_bar(self, 'content')
         self.body = CTkFrame(self, fg_color='transparent')
         self.body.grid(row=0, column=0, sticky='nsew', padx=PADDING, pady=(PADDING, 8))
         self.body.columnconfigure(1, weight=1)

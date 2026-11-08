@@ -5,6 +5,8 @@ from pygments import token
 from pygments.styles import get_style_by_name
 import re
 
+from rddl_ide.core.textfile import FileFormat
+
 PYTHON_GRAMMAR = [
     (token.Keyword, (r"\b(?P<KEYWORD>False|None|True|and|as|assert|async|await|"
                      r"break|class|continue|def|del|elif|else|except|finally|for|"
@@ -88,6 +90,7 @@ class CTkCodeViewer(CTkTextbox):
             self.patterns = RDDL_GRAMMAR
         self.bind("<KeyRelease>", lambda *_: self.apply())
         self.bind('<KeyPress>', self._word_boundary)
+        self.file_format = FileFormat()  # of the file the text was read from
         self._style_tags()
 
     def _word_boundary(self, event):
@@ -96,12 +99,19 @@ class CTkCodeViewer(CTkTextbox):
         if event.char in (' ', '\t', '\r', '\n'):
             self.edit_separator()
 
-    def set_text(self, text):
-        '''Replaces the whole text, as when a file is opened, which cannot be undone.'''
+    def set_text(self, text, file_format=FileFormat()):
+        '''Replaces the whole text, as when a file is opened, which cannot be undone; the
+        file_format is that of the file it was read from. Generates <<TextReplaced>>.'''
         self.delete('1.0', 'end')
         self.insert('1.0', text)
         self.edit_reset()
+        self.file_format = file_format
         self.apply()
+        self._textbox.event_generate('<<TextReplaced>>')
+
+    def content(self):
+        '''The text, without the new line that Tk always adds at the end.'''
+        return self.get('1.0', 'end-1c')
 
     def _style_tags(self):
         '''Colors the syntax and error tags for the current theme.'''

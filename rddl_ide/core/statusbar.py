@@ -1,13 +1,20 @@
-'''The status bar at the bottom of the window, which shows the progress of a run: the
-training metrics of a planner or learner, and the step and return of the episode.'''
+'''The status bar at the bottom of the window, which shows the progress of a run (the
+training metrics of a planner or learner, and the step and return of the episode), the
+cursor position and file format of the editor in use, and the Python environment.'''
+import os
+import sys
 import time
+from importlib import metadata
 from tkinter import TclError
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from customtkinter import CTkFont, CTkFrame, CTkLabel, ThemeManager
 
+from rddl_ide.core.icons import Tooltip
+
 REFRESH_SECONDS = 0.1  # during a run, the window is redrawn at most this often
 SEPARATOR = '   |   '  # between the episode and the training parts of the text
+SEGMENT_PADDING = 12  # around each part of the text on the right
 
 
 def number(value) -> str:
@@ -20,20 +27,85 @@ class RunStopped(BaseException):
     window); not an Exception, so that the code it passes through does not handle it.'''
 
 
+def environment() -> Tuple[str, str]:
+    '''The Python version, environment and pyRDDLGym version, short and in full.'''
+    python = '.'.join(map(str, sys.version_info[:3]))
+    name = os.environ.get('CONDA_DEFAULT_ENV')
+    if name is None and sys.prefix != sys.base_prefix:  # a virtual environment
+        name = os.path.basename(sys.prefix)
+    try:
+        pyrddlgym = f'pyRDDLGym {metadata.version("pyRDDLGym")}'
+    except metadata.PackageNotFoundError:
+        pyrddlgym = 'pyRDDLGym not installed'
+    short = f'Python {python}' + (f' ({name})' if name else '') + f' · {pyrddlgym}'
+    return (short, f'{sys.executable}\n{pyrddlgym}')
+
+
 class StatusBar(CTkFrame):
-    '''A line of text on the frame color with a hairline above it.'''
+    '''A line of text on the frame color with a hairline above it: what the IDE is doing
+    on the left; on the right, the cursor position and file format of the editor last
+    used, and the Python environment.'''
 
     def __init__(self, master):
         palette = ThemeManager.theme['Palette']
         super().__init__(master, corner_radius=0, fg_color=palette['chrome'])
         CTkFrame(self, height=1, corner_radius=0, fg_color=palette['border']).pack(
             side='top', fill='x')
+        self._font = CTkFont(size=13)
+        self._viewer = None  # whose position is shown
+        # packed first, so that a long message on the left cannot squeeze them
+        (short, full) = environment()
+        Tooltip(self._segment(short), full)
+        self.newline = self._segment('')
+        self.encoding = self._segment('')
+        self.position = self._segment('')
         self.label = CTkLabel(self, text='Ready', anchor='w', padx=12, height=28,
-                              text_color=palette['text'], font=CTkFont(size=13))
-        self.label.pack(side='top', fill='x')
+                              text_color=palette['text'], font=self._font)
+        self.label.pack(side='left', fill='x', expand=True)
+
+    def _segment(self, text: str) -> CTkLabel:
+        label = CTkLabel(self, text=text, padx=SEGMENT_PADDING, height=28,
+                         text_color=ThemeManager.theme['Palette']['text'], font=self._font)
+        label.pack(side='right')
+        return label
 
     def show(self, text: str) -> None:
         self.label.configure(text=text)
+
+    def track(self, viewer) -> None:
+        '''Shows the cursor position and file format of the code viewer (a CTkCodeViewer)
+        whenever it is used.'''
+        def update(_=None):
+            self._viewer = viewer
+            viewer.after_idle(self.update_position)  # after the event moved the cursor
+
+        def selected(_=None):  # also when selecting in another editor cleared this one's
+            if self._viewer is viewer:
+                viewer.after_idle(self.update_position)
+
+        for sequence in ('<FocusIn>', '<KeyRelease>', '<ButtonRelease-1>', '<<Undo>>',
+                         '<<Redo>>', '<<TextReplaced>>'):
+            viewer.bind(sequence, update, add='+')
+        viewer.bind('<<Selection>>', selected, add='+')
+
+    def update_position(self) -> None:
+        '''Shows the cursor position of the viewer last used, if it is still shown.'''
+        viewer = self._viewer
+        try:
+            if viewer is None or not viewer.winfo_viewable():
+                for segment in (self.position, self.encoding, self.newline):
+                    segment.configure(text='')
+                return
+            (line, column) = viewer.index('insert').split('.')
+            text = f'Ln {line}, Col {int(column) + 1}'
+            if viewer.tag_ranges('sel'):
+                text += f' ({len(viewer.get("sel.first", "sel.last"))} selected)'
+            (encoding, newline) = viewer.file_format.describe()
+            self.position.configure(text=text)
+            self.encoding.configure(text=encoding)
+            self.newline.configure(text=newline)
+        except TclError:  # the window was closed
+            pass
 
 
 class RunProgress:

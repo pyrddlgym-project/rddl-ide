@@ -12,6 +12,7 @@ from rddl_ide.core.menubar import assign_menubar_functions
 from rddl_ide.core.paneheader import PaneHeader
 from rddl_ide.core.policypane import PolicyPane
 from rddl_ide.core.statusbar import StatusBar
+from rddl_ide.core.titlebar import match_title_bar
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -42,6 +43,7 @@ def create_window():
     window = CTk()
     window.title('RDDL IDE')
     set_icon(window)
+    match_title_bar(window)  # one strip with the menu bar, on Windows 11
     screen_w, screen_h = window.winfo_screenwidth(), window.winfo_screenheight()
     window.geometry(f'{int(screen_w * 0.8)}x{int(screen_h * 0.8)}')
     window.after(0, lambda: _maximize(window))
