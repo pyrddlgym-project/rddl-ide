@@ -78,6 +78,8 @@ class CTkCodeViewer(CTkTextbox):
 
     def __init__(self, *args, width: int=100, height: int=32,
                  language='python', theme=SYNTAX_STYLES, **kwargs):
+        kwargs.setdefault('undo', True)
+        kwargs.setdefault('maxundo', -1)
         super().__init__(*args, width=width, height=height, **kwargs)
         self.styles = theme
         if language == 'python':
@@ -85,7 +87,21 @@ class CTkCodeViewer(CTkTextbox):
         else:
             self.patterns = RDDL_GRAMMAR
         self.bind("<KeyRelease>", lambda *_: self.apply())
+        self.bind('<KeyPress>', self._word_boundary)
         self._style_tags()
+
+    def _word_boundary(self, event):
+        '''Ends an undo step before each space, tab or new line typed, so that undo takes
+        back about a word at a time rather than everything typed in one go.'''
+        if event.char in (' ', '\t', '\r', '\n'):
+            self.edit_separator()
+
+    def set_text(self, text):
+        '''Replaces the whole text, as when a file is opened, which cannot be undone.'''
+        self.delete('1.0', 'end')
+        self.insert('1.0', text)
+        self.edit_reset()
+        self.apply()
 
     def _style_tags(self):
         '''Colors the syntax and error tags for the current theme.'''
@@ -113,12 +129,14 @@ class CTkCodeViewer(CTkTextbox):
         self.tag_remove(ERROR_TAG, '1.0', 'end')
 
     def apply(self):
+        '''Highlights the syntax, removing the highlighting of text that no longer matches.'''
+        lines = self.get('1.0', 'end').splitlines()
+        for tag in {str(tag) for (tag, _) in self.patterns}:  # patterns can share a tag
+            self.tag_remove(tag, '1.0', 'end')
         for (tag, pattern) in self.patterns:
-            text = self.get('0.0', 'end').splitlines()
-            for (i, line) in enumerate(text):
+            for (i, line) in enumerate(lines, 1):
                 for found in re.finditer(pattern, line):
-                    self.tag_add(
-                        str(tag), f"{i + 1}.{found.start()}", f"{i + 1}.{found.end()}")
+                    self.tag_add(str(tag), f'{i}.{found.start()}', f'{i}.{found.end()}')
 
 
 class LineNumbers(tkinter.Canvas):

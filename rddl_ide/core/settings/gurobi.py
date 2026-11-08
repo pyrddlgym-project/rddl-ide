@@ -89,6 +89,6 @@ class GurobiProvider(Provider):
         assign(state, self.section('gurobi'), values.get('Gurobi', {}))
         return state
 
-    def build_policy(self, env, state: FormState):
+    def build_policy(self, env, state: FormState, progress=None):
         controller_args = planner.load_config_from_string(self.to_config(state))
         return planner.GurobiOnlineController(rddl=env.model, **controller_args)

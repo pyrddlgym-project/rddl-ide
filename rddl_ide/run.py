@@ -11,6 +11,7 @@ from rddl_ide.core.codearea import CodeEditor
 from rddl_ide.core.menubar import assign_menubar_functions
 from rddl_ide.core.paneheader import PaneHeader
 from rddl_ide.core.policypane import PolicyPane
+from rddl_ide.core.statusbar import StatusBar
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -48,6 +49,8 @@ def create_window():
     menu = CTkMenuBar(window, bg_color=palette['chrome'], padx=2, pady=3)
 
     # domain on the left, instance above policy on the right, with draggable dividers
+    status_bar = StatusBar(window)  # packed first, so that the panes cannot squeeze it
+    status_bar.pack(side='bottom', fill='x')
     divider = window._apply_appearance_mode(ThemeManager.theme['CTk']['fg_color'])
     panes = PanedWindow(window, orient='horizontal', sashwidth=6, bd=0, bg=divider)
     panes.pack(fill='both', expand=True)
@@ -78,7 +81,7 @@ def create_window():
     window.after(200, place_dividers)
 
     assign_menubar_functions(menu, window, domain_pane, inst_pane, policy_pane,
-                             domain_pane.editor.text, inst_pane.editor.text)
+                             domain_pane.editor.text, inst_pane.editor.text, status_bar)
     return window, domain_pane, inst_pane, policy_pane
 
 

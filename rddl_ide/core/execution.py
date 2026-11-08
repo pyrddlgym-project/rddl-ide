@@ -6,6 +6,8 @@ from tkinter import messagebox
 import pyRDDLGym
 from pyRDDLGym.core.visualizer.movie import MovieGenerator
 
+from rddl_ide.core.statusbar import RunProgress, RunStopped, number
+
 _ANSI_CODE = re.compile(r'\033\[[0-9;]*m')
 
 
@@ -17,32 +19,65 @@ def policy_from_code(source):
     return namespace['build_policy'], namespace['required_env_args']
 
 
-def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz, record):
-    '''Runs one episode of the policy built by build_policy(env) in an environment made
-    with the arguments returned by required_env_args(); shows an error in a dialog and
-    returns its message (with the terminal formatting that marks the line of a syntax
-    error), if any.'''
+class _Episode:
+    '''Reports each step of the episode, by wrapping the step() of the environment.'''
 
-    def target():
+    def __init__(self, env, progress: RunProgress):
+        self.steps, self.total, self.discount = 0, 0.0, 1.0
+        env_step = env.step
+
+        def step(action):
+            result = env_step(action)
+            reward = float(result[1])
+            self.steps += 1
+            self.total += reward * self.discount
+            self.discount *= env.discount
+            progress.step(self.steps, env.horizon, reward, self.total)
+            return result
+
+        env.step = step
+
+
+def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz, record,
+                    progress: RunProgress):
+    '''Runs one episode of the policy built by build_policy(env) in an environment made
+    with the arguments returned by required_env_args(), showing its progress; shows an
+    error in a dialog and returns its message (with the terminal formatting that marks
+    the line of a syntax error), if any.'''
+    env = None
+    try:
         try:
+            progress.note('Preparing the environment and the policy...')
             env_args = required_env_args()
             env = pyRDDLGym.make(domain=domain_file, instance=inst_file, **env_args)
             movie_gen = None
             if record is not None:
                 movie_gen = MovieGenerator(record, env.model.domain_name, 9999)
             env.set_visualizer(viz, movie_gen=movie_gen)
-            policy = build_policy(env) 
+            policy = build_policy(env)
+            episode = _Episode(env, progress)
             policy.evaluate(env, episodes=1, verbose=True, render=True)
             env.close()
+            env = None
+            progress.finish(f'Done · {episode.steps} steps · return {number(episode.total)}')
             return None
-        except Exception as e:
+        except Exception as error:
             print(traceback.format_exc(), file=sys.stderr)
-            return e
-    
-    err = target()
-    if err is None:
+            _close(env)
+            env = None
+            progress.finish('Stopped by an error')
+            message = str(error)
+            messagebox.showerror('pyRDDLGym error', _ANSI_CODE.sub('', message))
+            return message
+    except RunStopped:
+        _close(env)
         return None
-    err = str(err)
-    messagebox.showerror('pyRDDLGym error', _ANSI_CODE.sub('', err))
-    return err
 
+
+def _close(env) -> None:
+    '''Closes the environment (and its visualizer) of a run that did not finish.'''
+    if env is not None:
+        try:
+            env.close()
+        except Exception:  # the run's own error, if any, is the one to report
+            pass

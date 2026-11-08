@@ -6,10 +6,12 @@ from typing import Any, Dict, List
 
 from pyRDDLGym_rl.core.env import SimplifiedActionRDDLEnv
 from pyRDDLGym_rl.core.sb3_trainer import METHODS, StableBaselinesTrainer
+from stable_baselines3.common.callbacks import BaseCallback
 
 from rddl_ide.core.settings.introspect import signature_fields
 from rddl_ide.core.settings.model import Field, FormState, Section
 from rddl_ide.core.settings.provider import Provider, assign, read_config, write_config
+from rddl_ide.core.statusbar import number
 
 # arguments the IDE supplies, or that only make sense for the IDE to set
 NOT_CONFIGURABLE_ALGORITHM = {'policy', 'env'}
@@ -70,9 +72,36 @@ class StableBaselinesProvider(Provider):
     def env_args(self, state: FormState) -> Dict[str, Any]:
         return {'base_class': SimplifiedActionRDDLEnv, **self.changed(state, 'environment')}
 
-    def build_policy(self, env, state: FormState):
+    def build_policy(self, env, state: FormState, progress=None):
         trainer = StableBaselinesTrainer(
             env, self.section('algorithm').option(state),
             **self.changed(state, 'trainer'), **self.changed(state, 'algorithm'))
-        trainer.train(**self.changed(state, 'train'))
+        callback = None if progress is None else _ReportTraining(progress)
+        trainer.train(callback=callback, **self.changed(state, 'train'))
         return trainer.agent()
+
+
+class _ReportTraining(BaseCallback):
+    '''Reports the timesteps trained and the mean reward of the recent episodes.'''
+
+    def __init__(self, progress) -> None:
+        super().__init__()
+        self.progress = progress
+
+    def _on_training_start(self) -> None:
+        self._start = self.model.num_timesteps  # of earlier training sessions
+        self._total = self.locals['total_timesteps'] - self._start
+
+    def _on_step(self) -> bool:
+        self.progress.training(self._describe)
+        return True
+
+    def _describe(self) -> str:
+        done = self.model.num_timesteps - self._start
+        text = f'Training {100 * done // max(self._total, 1)}% · ' \
+               f'timestep {done:,}/{self._total:,}'
+        episodes = self.model.ep_info_buffer
+        if episodes:
+            mean = sum(episode['r'] for episode in episodes) / len(episodes)
+            text += f' · mean episode reward {number(mean)}'
+        return text

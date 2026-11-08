@@ -11,10 +11,11 @@ from rddl_ide.core.errorlocation import locate_error
 from rddl_ide.core.execution import evaluate_policy
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
+from rddl_ide.core.statusbar import RunProgress
 
 
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
-                             domain_editor, inst_editor):
+                             domain_editor, inst_editor, status_bar):
     policy_editor = policy_pane.text
     domain_file, inst_file, viz = None, None, None
     
@@ -30,26 +31,19 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         nonlocal domain_file, viz
         domain_file, viz = None, None
         domain_pane.title('Domain: Untitled')
-        domain_editor.delete(1.0, 'end')
-        domain_editor.insert(1.0, DOMAIN_TEMPLATE)
-        domain_editor.apply()
+        domain_editor.set_text(DOMAIN_TEMPLATE)
         
     def create_instance():
         nonlocal inst_file
         inst_file = None
         inst_pane.title('Instance: Untitled')
-        inst_editor.delete(1.0, 'end')
-        inst_editor.insert(1.0, INSTANCE_TEMPLATE)
-        inst_editor.apply()
+        inst_editor.set_text(INSTANCE_TEMPLATE)
     
     def _pane_from_file(window, editor, caption, file_path):
         if file_path is not None:
             window.title(f'{caption}: {os.path.basename(file_path)}')
-            editor.delete(1.0, 'end')
             with open(file_path, 'r') as new_file:
-                editor.insert(1.0, new_file.read())
-                new_file.close()
-            editor.apply()
+                editor.set_text(new_file.read())
         
     def open_domain():
         nonlocal domain_file, viz    
@@ -179,8 +173,22 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         inst_file = None
         save_instance()
         
+    active_run = None  # the progress of a run going on, during which events are handled
+    close_after_run = False
+
     def exit_application():
-        root.destroy()
+        nonlocal close_after_run
+        if active_run is not None:
+            close_after_run = True  # the window is closed once the run has unwound
+            active_run.stop()
+        else:
+            root.destroy()
+
+    def stop_run():
+        if active_run is not None:
+            active_run.stop()
+
+    root.protocol('WM_DELETE_WINDOW', exit_application)
     
     def register_domain():        
         master = ToplevelWindow(root)
@@ -264,6 +272,14 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         editor.focus_set()
         editor._textbox.event_generate(event)  # CTkTextbox does not forward events
 
+    def undo_text():
+        _edit_event('<<Undo>>')
+        last_focused[0].apply()  # typing highlights on key release, a menu click does not
+
+    def redo_text():
+        _edit_event('<<Redo>>')
+        last_focused[0].apply()
+
     def copy_text():
         _edit_event('<<Copy>>')
 
@@ -303,20 +319,33 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
     # policy RUN functions
     def _evaluate(record):
-        nonlocal domain_file, inst_file, viz
+        nonlocal domain_file, inst_file, viz, active_run
+        if active_run is not None:
+            return
         save_domain()
         save_instance()
         if domain_file is not None and inst_file is not None:
             editors = {'domain': domain_editor, 'instance': inst_editor}
             for editor in editors.values():
                 editor.clear_error()
+            progress = RunProgress(status_bar)
             try:
-                build_policy, required_env_args = policy_pane.policy()
+                build_policy, required_env_args = policy_pane.policy(progress)
             except Exception as error:
                 _show_error('Policy error', error)
                 return
-            message = evaluate_policy(domain_file, inst_file, build_policy, required_env_args,
-                                      viz, record)
+            active_run = progress
+            try:
+                message = evaluate_policy(domain_file, inst_file, build_policy,
+                                          required_env_args, viz, record, progress)
+            finally:
+                active_run = None
+            if close_after_run:
+                root.destroy()
+                return
+            if progress.stopped:
+                progress.show_stopped()
+                return
             if message is not None:
                 location = locate_error(message, domain_editor.get('1.0', 'end'),
                                         inst_editor.get('1.0', 'end'))
@@ -361,6 +390,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     # edit menu, for the editor that last had the focus
     edit_menu = menu.add_cascade("Edit")
     edit_menu_drop = MenuBarMenu(edit_menu)
+    edit_menu_drop.add_option(option='Undo', command=undo_text)
+    edit_menu_drop.add_option(option='Redo', command=redo_text)
+    edit_menu_drop.add_separator()
     edit_menu_drop.add_option(option='Copy', command=copy_text)
     edit_menu_drop.add_option(option='Cut', command=cut_text)
     edit_menu_drop.add_option(option='Paste', command=paste_text)
@@ -377,6 +409,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     agent_menu_drop.add_separator()
     agent_menu_drop.add_option(option='Evaluate', command=evaluate)
     agent_menu_drop.add_option(option='Record', command=record)
+    agent_menu_drop.add_option(option='Stop', command=stop_run)
 
     # view menu
     def toggle_theme():

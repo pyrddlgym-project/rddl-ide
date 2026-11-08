@@ -5,6 +5,7 @@ import inspect
 import os
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import optax
 import pyRDDLGym_jax
 from pyRDDLGym_jax.core import config, controller, logic, plan, planner
@@ -14,6 +15,7 @@ from rddl_ide.core.settings.model import Field, FormState, Section
 from rddl_ide.core.settings.provider import (
     Provider, assign, fields_with_traced_kwargs, read_config, write_config
 )
+from rddl_ide.core.statusbar import number
 
 # arguments a config cannot set: objects that the config loader or the planner supply
 NOT_CONFIGURABLE_COMPILER = {'rddl', 'logger', 'python_functions'}
@@ -183,7 +185,7 @@ class JaxPlanProvider(Provider):
             default_option=lambda state: 'JaxStraightLinePlan')
         optimize = Section(
             'optimize', '[Optimize]', fields=lambda option, state: self._optimize_fields())
-        return [planners, compiler, auxiliary, plans, optimize]
+        return [planners, auxiliary, plans, optimize, compiler]
 
     def sections(self) -> List[Section]:
         return self._sections
@@ -257,10 +259,36 @@ class JaxPlanProvider(Provider):
     def env_args(self, state: FormState) -> Dict[str, Any]:
         return {'vectorized': True}
 
-    def build_policy(self, env, state: FormState):
+    def build_policy(self, env, state: FormState, progress=None):
         planner_args, _, train_args = config.load_config_from_string(self.to_config(state))
         if 'dashboard' in planner_args:
             planner_args['dashboard'].launch()
         jax_planner = planner.create_planner(
             rddl=env.model, dashboard_viz=getattr(env, '_visualizer', None), **planner_args)
+        if progress is not None:
+            online = self.controller is controller.JaxOnlineController
+            _report_training(jax_planner, progress, 'Planning' if online else 'Training')
         return self.controller(jax_planner, **train_args)
+
+
+def _report_training(jax_planner, progress, caption: str) -> None:
+    '''Reports every iteration of the planner's training to progress: optimize(), which
+    the controllers call, runs optimize_generator(), which yields the metrics.'''
+    generate = jax_planner.optimize_generator
+
+    def describe(callback) -> str:
+        # the returns of the policies optimized in parallel: shows the best on test
+        test = np.ravel(callback['test_return'])
+        index = int(np.argmax(test))
+        train = np.ravel(callback['train_return'])[index]
+        return (f'{caption} {int(callback["progress"])}% · '
+                f'iter {callback["iteration"]} · {callback["elapsed_time"]:.1f} s · '
+                f'train {number(train)} · test {number(test[index])} · '
+                f'best {number(callback["best_return"])}')
+
+    def optimize_generator(*args, **kwargs):
+        for callback in generate(*args, **kwargs):
+            progress.training(lambda: describe(callback))
+            yield callback
+
+    jax_planner.optimize_generator = optimize_generator

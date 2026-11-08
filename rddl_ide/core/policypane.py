@@ -36,9 +36,7 @@ class PolicyPane(CTkFrame):
     def show_code(self, source, caption):
         self._clear()
         self.mode = 'code'
-        self.text.delete('1.0', 'end')
-        self.text.insert('1.0', source)
-        self.text.apply()
+        self.text.set_text(source)
         self.code_frame.pack(fill='both', expand=True)
         self.title(f'Policy: {caption}')
 
@@ -95,11 +93,12 @@ class PolicyPane(CTkFrame):
     # running
     # ===========================================================================
 
-    def policy(self):
-        '''Returns build_policy(env) and required_env_args() for the policy shown.'''
+    def policy(self, progress=None):
+        '''Returns build_policy(env) and required_env_args() for the policy shown; a
+        baseline reports its training to progress, a RunProgress, if given.'''
         if self.mode == 'form':
             provider, state = self.provider, self.state
-            return (lambda env: provider.build_policy(env, state),
+            return (lambda env: provider.build_policy(env, state, progress),
                     lambda: provider.env_args(state))
         if self.mode == 'code':
             return policy_from_code(self.text.get('1.0', 'end'))

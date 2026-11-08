@@ -110,7 +110,9 @@ class Provider:
     def from_config(self, text: str) -> FormState:
         raise NotImplementedError
 
-    def build_policy(self, env, state: FormState):
+    def build_policy(self, env, state: FormState, progress=None):
+        '''Builds the policy for env, reporting its training (if any) to progress, a
+        RunProgress, if given.'''
         raise NotImplementedError
 
     def section(self, section_id: str) -> Section:

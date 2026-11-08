@@ -14,6 +14,7 @@ from rddl_ide.core.settings.model import format_value, is_changed, parse_value
 
 CHANGED_COLOR = ('#a06800', '#e5c07b')
 FONT_SIZE = 14
+BODY_INDENT = 30  # the settings of a section start below its title, after the arrow
 WHEEL_STEP = 80  # pixels scrolled per mouse wheel notch before DPI scaling, ~3 rows
 
 
@@ -80,17 +81,25 @@ class SettingsForm(CTkScrollableFrame):
     def _theme(self) -> None:
         '''Resolves the theme colors and the font for the current appearance and scaling.'''
         color = self._apply_appearance_mode
-        entry = ThemeManager.theme['CTkEntry']
+        palette = {name: color(value) for (name, value) in ThemeManager.theme['Palette'].items()}
+
+        # one font for the whole form: the editors' monospace font at one size, as a Tk
+        # font for the Tk widgets and as a CTkFont (which CTk scales) for the CTk widgets
         self.mono = font.Font(family=self.family, size=-self._scaled(FONT_SIZE))
+        self.ctk_font = CTkFont(family=self.family, size=FONT_SIZE)
+
         self.background = tkinter.Frame.cget(self, 'bg')
-        self.label_color = color(ThemeManager.theme['CTkLabel']['text_color'])
+        self.label_color = palette['text']
         self.changed_color = color(CHANGED_COLOR)
+
+        # the value fields blend with the form: a border shows on hover, an accent one
+        # while typing
         self.entry_style = dict(
-            bg=color(entry['fg_color']), insertbackground=color(entry['text_color']),
-            relief='flat', bd=self._scaled(3), highlightthickness=1,
-            highlightbackground=color(entry['border_color']),
-            highlightcolor=color(ThemeManager.theme['CTkButton']['fg_color']))
-        self.entry_colors = (color(entry['text_color']), color(entry['placeholder_text_color']))
+            bg=self.background, insertbackground=palette['text'], relief='flat',
+            bd=self._scaled(3), highlightthickness=1, highlightbackground=self.background,
+            highlightcolor=palette['accent'])
+        self.hover_border = palette['field_border']
+        self.entry_colors = (palette['text'], palette['text_muted'])
 
     def render(self) -> None:
         self._theme()
@@ -104,7 +113,7 @@ class SettingsForm(CTkScrollableFrame):
 
     def _render_into(self, content) -> None:
         CTkCheckBox(content, text='show changed only', variable=self.only_changed,
-                    command=self.render).grid(row=0, column=0, sticky='w', padx=8, pady=6)
+                    font=self.ctk_font, command=self.render).grid(row=0, column=0, sticky='w', padx=8, pady=6)
         row = 1
         for section in self.provider.sections():
             option = section.option(self.state)
@@ -115,14 +124,14 @@ class SettingsForm(CTkScrollableFrame):
                       anchor='w', corner_radius=4, fg_color='transparent',
                       hover_color=ThemeManager.theme['Palette']['hover'],
                       text_color=ThemeManager.theme['Palette']['text'],
-                      font=CTkFont(weight='bold'),
+                      font=self.ctk_font,
                       command=lambda s=section.id: self.toggle(s)
                       ).grid(row=row, column=0, sticky='ew', padx=4, pady=(4, 0))
             row += 1
             if is_open:
                 body = tkinter.Frame(content, bg=self.background)
                 body.grid(row=row, column=0, sticky='ew',
-                          padx=(self._scaled(16), self._scaled(4)),
+                          padx=(self._scaled(BODY_INDENT), self._scaled(4)),
                           pady=(self._scaled(2), self._scaled(4)))
                 body.columnconfigure(1, weight=1)
                 self._render_section(body, section, option, fields)
@@ -132,10 +141,8 @@ class SettingsForm(CTkScrollableFrame):
         row = 0
         if section.chooser is not None:
             self._name_label(body, row, section.chooser, False)
-            menu = ChoiceMenu(body, values=section.options(self.state),
-                                 command=lambda value, s=section: self.choose(s, value))
-            menu.set(option)
-            menu.grid(row=row, column=1, sticky='w', pady=1)
+            self._chooser(body, row, section.options(self.state), option,
+                          lambda value, s=section: self.choose(s, value))
             row += 1
         for field in fields:
             if field.nested is None:
@@ -169,7 +176,34 @@ class SettingsForm(CTkScrollableFrame):
         entry = _Entry(body, text, placeholder, *self.entry_colors, font=self.mono,
                        **self.entry_style)
         entry.grid(row=row, column=1, sticky='ew', pady=1)
+        self._border_on_hover(entry)
         return entry
+
+    def _border_on_hover(self, widget) -> None:
+        '''Shows the border of a field that blends with the form while the pointer is on it.'''
+        widget.bind('<Enter>', lambda _: widget.configure(highlightbackground=self.hover_border),
+                    add=True)
+        widget.bind('<Leave>', lambda _: widget.configure(highlightbackground=self.background),
+                    add=True)
+
+    def _chooser(self, body, row, values, current, command) -> ChoiceMenu:
+        '''A chooser that blends with the form like the other fields.'''
+        palette = ThemeManager.theme['Palette']
+        menu = ChoiceMenu(body, values=values, command=command, font=self.ctk_font,
+                          fg_color=palette['content'], button_color=palette['content'],
+                          button_hover_color=palette['content'], text_color=palette['text'])
+
+        def shade(color):  # the whole chooser, not just its arrow, shows the hover
+            try:
+                menu.configure(fg_color=color, button_color=color, button_hover_color=color)
+            except TclError:  # the form was redrawn by the choice
+                pass
+
+        menu.bind('<Enter>', lambda _: shade(palette['hover']), add=True)
+        menu.bind('<Leave>', lambda _: shade(palette['content']), add=True)
+        menu.set(current)
+        menu.grid(row=row, column=1, sticky='w', pady=1)
+        return menu
 
     def _row(self, body, row, section, option, path, field, indent='') -> int:
         text = self.state.text(section.id, option, path)
@@ -189,9 +223,7 @@ class SettingsForm(CTkScrollableFrame):
                 self.state.set_text(section.id, option, path, value)
                 self.render()
 
-            menu = ChoiceMenu(body, values=field.options, command=picked)
-            menu.set(shown)
-            menu.grid(row=row, column=1, sticky='w', pady=1)
+            self._chooser(body, row, field.options, shown, picked)
 
         elif isinstance(field.default, bool):
             style = {k: v for (k, v) in self.entry_style.items() if k != 'insertbackground'}
@@ -208,6 +240,7 @@ class SettingsForm(CTkScrollableFrame):
                 toggle.bind(event, toggled)
             toggle.bind('<Button-1>', lambda _: toggle.focus_set(), add=True)
             toggle.grid(row=row, column=1, sticky='w', pady=1)
+            self._border_on_hover(toggle)
             
         else:
             entry = self._entry(body, row, shown, 'required' if field.required else None)

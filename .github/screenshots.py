@@ -14,6 +14,7 @@ from customtkinter import CTkFont, set_appearance_mode
 
 from rddl_ide.core.codearea import monospace_family
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
+from rddl_ide.core.statusbar import StatusBar
 from rddl_ide.run import create_window
 
 SAMPLE_DOMAIN = '''domain sample {
@@ -97,11 +98,13 @@ def main(folder):
     window.geometry('1600x950+0+0')
     pump(window, 1.0)
     for (pane, text) in ((domain, domain_text), (instance, instance_text)):
-        pane.editor.text.insert('1.0', text)
-        pane.editor.text.apply()
+        pane.editor.text.set_text(text)
     lines = domain_text.splitlines()
     line = next((i for (i, text) in enumerate(lines, 1) if "'" in text and '=' in text), 1)
     domain.editor.text.show_error(f'{line}.0', f'{line}.end')
+    status = next(w for w in window.winfo_children() if isinstance(w, StatusBar))
+    status.show('Step 12/40 · reward 0 · return -130   |   Training 100% · iter 180 · '
+                '3.0 s · train -3457.7 · test -1491.2 · best -917.09')
     agent = next(menu for menu in MenuBarMenu._menus if menu.button.cget('text') == 'Agent')
     describe(window, domain, os.path.join(folder, 'info.txt'))
 

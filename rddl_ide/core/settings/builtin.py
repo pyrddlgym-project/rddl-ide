@@ -48,7 +48,7 @@ class BuiltinAgentProvider(Provider):
         assign(state, self.section('agent'), values)
         return state
 
-    def build_policy(self, env, state: FormState):
+    def build_policy(self, env, state: FormState, progress=None):
         cls = self.agents[self.section('agent').option(state)]
         kwargs = self.changed(state, 'agent')
         parameters = inspect.signature(cls.__init__).parameters
