@@ -1,10 +1,14 @@
 import os
+import sys
+import traceback
 from difflib import SequenceMatcher
+from tkinter import messagebox
 from customtkinter import CTkToplevel, CTkOptionMenu, StringVar, CTkLabel, CTkButton, CTkEntry
 from customtkinter import filedialog as fd
 from CTkMenuBar import CustomDropdownMenu
 
-from rddl_ide.core.execution import evaluate_policy_fn
+from rddl_ide.core.execution import evaluate_policy
+from rddl_ide.core.settings.registry import PROVIDERS
 
 
 def closest_substring(corpus, query, case_sensitive=True):
@@ -49,15 +53,9 @@ def closest_substring(corpus, query, case_sensitive=True):
     return adjust_left_right_positions()
 
 
-def load_policy(name):
-    abs_path = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(abs_path, 'prefab', 'policies', name + '.py'), 'r') as file:
-        content = file.read()
-    return content    
-
-
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
-                             domain_editor, inst_editor, policy_editor):
+                             domain_editor, inst_editor):
+    policy_editor = policy_pane.text
     domain_file, inst_file, viz = None, None, None
     
     # load template RDDL
@@ -317,54 +315,33 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         _edit_event('<<Paste>>')
 
     # policy SELECT functions
-    def _fill_policy_pane(policy_name, caption):
-        policy_editor.delete(1.0, 'end')
-        policy_editor.insert(1.0, load_policy(policy_name))
-        policy_pane.title(f'Policy: {caption}')
-        policy_editor.apply()
-    
+    POLICY_FILES = [('Policy (config or Python)', '*.cfg *.py'), ('Config', '*.cfg'),
+                    ('Python', '*.py')]
+
+    def _show_error(title, error):
+        print(traceback.format_exc(), file=sys.stderr)
+        messagebox.showerror(title, f'{type(error).__name__}: {error}')
+
     def load_policy_from_file():
-        policy_file = fd.askopenfilename(defaultextension='.py',
-                                         filetypes=[('Python File', '*.py*')])
-        if policy_file is not None and policy_file:
-            with open(policy_file, 'r') as policy_file:
-                policy_editor.delete(1.0, 'end')
-                policy_editor.insert(1.0, policy_file.read())
-                policy_pane.title('Policy: Custom')
-                policy_editor.apply()
-        
+        policy_file = fd.askopenfilename(filetypes=POLICY_FILES)
+        if policy_file:
+            try:
+                policy_pane.load(policy_file)
+            except Exception as error:
+                _show_error('Could not load policy', error)
+
     def save_policy_as():
-        policy_file = fd.asksaveasfilename(initialfile='policy.py',
-                                           defaultextension='.py',
-                                           filetypes=[('Python File', '*.py*')])
-        if policy_file is not None and policy_file:
-            with open(policy_file, 'w') as new_file:
-                new_file.write(policy_editor.get(1.0, 'end'))
-                new_file.close()
-        
-    def load_noop():
-        _fill_policy_pane('noop', 'NoOp')
-    
-    load_noop()
-        
-    def load_random(): 
-        _fill_policy_pane('random', 'Random')
-    
-    def load_jax_slp():
-        _fill_policy_pane('jax_slp', 'JAX-SLP')
-        
-    def load_jax_replan():
-        _fill_policy_pane('jax_replan', 'JAX-SLP-Replan')
-        
-    def load_jax_drp():
-        _fill_policy_pane('jax_drp', 'JAX-DRP')
-        
-    def load_gurobi_replan():
-        _fill_policy_pane('gurobi_replan', 'Gurobi-SLP-Replan')
-        
-    def load_sb3_ppo():
-        _fill_policy_pane('sb3_ppo', 'StableBaselines3-PPO')
-        
+        extension = policy_pane.default_extension()
+        policy_file = fd.asksaveasfilename(initialfile='policy' + extension,
+                                           defaultextension=extension, filetypes=POLICY_FILES)
+        if policy_file:
+            try:
+                policy_pane.save(policy_file)
+            except Exception as error:
+                _show_error('Could not save policy', error)
+
+    policy_pane.show_form('builtin')
+
     # policy RUN functions
     def _evaluate(record):
         nonlocal domain_file, inst_file, viz
@@ -372,7 +349,13 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         save_instance()
         if domain_file is not None and inst_file is not None:
             domain_editor.tag_delete('showerror')
-            query = evaluate_policy_fn(domain_file, inst_file, policy_editor, viz, record)
+            try:
+                build_policy, required_env_args = policy_pane.policy()
+            except Exception as error:
+                _show_error('Policy error', error)
+                return
+            query = evaluate_policy(domain_file, inst_file, build_policy, required_env_args,
+                                    viz, record)
             if query is not None:
                 corpus = domain_editor.get(1.0, 'end')
                 start, end = closest_substring(corpus, query)                
@@ -423,16 +406,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     # policy load menu
     policy_load_menu = menu.add_cascade("Baseline")
     policy_load_menu_drop = CustomDropdownMenu(widget=policy_load_menu, font=("Roboto", 14))
-    policy_load_menu_drop.add_option(option='No-Op', command=load_noop)
-    policy_load_menu_drop.add_option(option='Random', command=load_random)
-    policy_load_menu_drop.add_separator()
-    policy_load_menu_drop.add_option(option='JAX Planner (SLP)', command=load_jax_slp)
-    policy_load_menu_drop.add_option(option='JAX Planner (SLP+Replan)', command=load_jax_replan)
-    policy_load_menu_drop.add_option(option='JAX Planner (DRP)', command=load_jax_drp)
-    policy_load_menu_drop.add_separator()
-    policy_load_menu_drop.add_option(option='Gurobi Planner (SLP+Replan)', command=load_gurobi_replan)
-    policy_load_menu_drop.add_separator()
-    policy_load_menu_drop.add_option(option='Stable-Baselines3 (PPO)', command=load_sb3_ppo)
+    for (kind, title, _) in PROVIDERS:
+        policy_load_menu_drop.add_option(
+            option=title, command=lambda kind=kind: policy_pane.show_form(kind))
     
     # edit menu, for the editor that last had the focus
     edit_menu = menu.add_cascade("Edit")

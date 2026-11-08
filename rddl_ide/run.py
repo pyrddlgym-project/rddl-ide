@@ -5,6 +5,7 @@ from CTkMenuBar import CTkMenuBar
 
 from rddl_ide.core.codearea import CodeEditor
 from rddl_ide.core.menubar import assign_menubar_functions
+from rddl_ide.core.policypane import PolicyPane
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -48,7 +49,7 @@ def main():
     domain_pane = EditorPane(panes, 'rddl', 'Domain: Untitled')
     right_panes = PanedWindow(panes, orient='vertical', sashwidth=6, bd=0, bg=divider)
     inst_pane = EditorPane(right_panes, 'rddl', 'Instance: Untitled')
-    policy_pane = EditorPane(right_panes, 'python', 'Policy')
+    policy_pane = PolicyPane(right_panes)
     panes.add(domain_pane, minsize=200, stretch='always')
     panes.add(right_panes, minsize=200, stretch='always')
     right_panes.add(inst_pane, minsize=100, stretch='always')
@@ -62,8 +63,7 @@ def main():
     window.after(200, place_dividers)
 
     assign_menubar_functions(menu, window, domain_pane, inst_pane, policy_pane,
-                             domain_pane.editor.text, inst_pane.editor.text,
-                             policy_pane.editor.text)
+                             domain_pane.editor.text, inst_pane.editor.text)
     window.mainloop()
 
 
