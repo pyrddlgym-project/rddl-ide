@@ -16,8 +16,9 @@ class PaneHeader(CTkFrame):
     def __init__(self, master, text):
         palette = ThemeManager.theme['Palette']
         super().__init__(master, corner_radius=0, fg_color=palette['chrome'])
-        CTkFrame(self, height=1, corner_radius=0, fg_color=palette['border']).pack(
-            side='bottom', fill='x')
+        self.line = CTkFrame(self, height=1, corner_radius=0, fg_color=palette['border'])
+        self.line.pack(side='bottom', fill='x', pady=(1, 0))  # as high as when active
+        self.active = False
         self.tools = CTkFrame(self, corner_radius=0, fg_color='transparent')
         self.tools.pack(side='right', padx=(0, 4))
         self._font = CTkFont(size=13)
@@ -29,11 +30,31 @@ class PaneHeader(CTkFrame):
                               text_color=palette['text'], font=self._font)
         self.label.pack(side='left')
         self._caption(text)
+        self.dot = CTkLabel(self, text='●', anchor='w', padx=0, width=0, height=30,
+                            text_color=palette['text'], font=CTkFont(size=10))
         self.crumbs = CTkFrame(self, corner_radius=0, fg_color='transparent', height=30)
         self.crumbs.pack(side='left', fill='x', expand=True)
         self._crumb_texts = []
         self._crumb_actions = []
         self._gap = False
+
+    def set_active(self, active: bool) -> None:
+        '''Underlines the header in the accent color while its pane is the one the
+        keyboard shortcuts act on.'''
+        if active != self.active:
+            self.active = active
+            palette = ThemeManager.theme['Palette']
+            self.line.configure(height=2 if active else 1,
+                                fg_color=palette['accent' if active else 'border'])
+            gap = round(self._apply_widget_scaling(1))
+            self.line.pack_configure(pady=0 if active else (gap, 0))
+
+    def set_modified(self, modified: bool) -> None:
+        '''Shows a dot after the caption while what the pane shows has unsaved changes.'''
+        if modified and not self.dot.winfo_ismapped():
+            self.dot.pack(side='left', after=self.label, padx=(6, 0))
+        elif not modified:
+            self.dot.pack_forget()
 
     def set_crumbs(self, crumbs: List[Tuple[str, Callable[[], None]]]) -> None:
         '''Shows the breadcrumb after the caption: (text, action on a click) of each part.

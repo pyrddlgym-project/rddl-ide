@@ -1,18 +1,21 @@
 import os
 import sys
 import traceback
-from tkinter import messagebox
+from tkinter import TclError, messagebox
 from customtkinter import StringVar, CTkEntry, ThemeManager
 from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
+from rddl_ide.core.checking import check
 from rddl_ide.core.dialog import Dialog
+from rddl_ide.core.findbar import FindBar
 from rddl_ide.core.errorlocation import locate_error, strip_ansi
 from rddl_ide.core.execution import evaluate_policy
 from rddl_ide.core.grounding import ground
 from rddl_ide.core.icons import RECORD_COLOR, IconButton
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
+from rddl_ide.core.shortcuts import MAC, WINDOWS, Shortcuts, label
 from rddl_ide.core.statusbar import RunProgress
 from rddl_ide.core import textfile
 
@@ -34,12 +37,16 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     # FILE functions
     def create_domain():
         nonlocal domain_file, viz
+        if not confirm_discard('domain'):
+            return
         domain_file, viz = None, None
         domain_pane.title('Domain: Untitled')
         domain_editor.set_text(DOMAIN_TEMPLATE)
         
     def create_instance():
         nonlocal inst_file
+        if not confirm_discard('instance'):
+            return
         inst_file = None
         inst_pane.title('Instance: Untitled')
         inst_editor.set_text(INSTANCE_TEMPLATE)
@@ -50,19 +57,24 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             editor.set_text(*textfile.read(file_path))
         
     def open_domain():
-        nonlocal domain_file, viz    
-        domain_file = fd.askopenfilename(
+        nonlocal domain_file, viz
+        if not confirm_discard('domain'):
+            return
+        path = fd.askopenfilename(
             defaultextension='.rddl', filetypes=[('RDDL File', '*.rddl*')])
-        viz = None
-        if domain_file == '': domain_file = None            
-        _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
-    
+        if path:
+            domain_file, viz = path, None
+            _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
+
     def open_instance():
-        nonlocal inst_file        
-        inst_file = fd.askopenfilename(
+        nonlocal inst_file
+        if not confirm_discard('instance'):
+            return
+        path = fd.askopenfilename(
             defaultextension='.rddl', filetypes=[('RDDL File', '*.rddl*')])
-        if inst_file == '': inst_file = None            
-        _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)
+        if path:
+            inst_file = path
+            _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)
     
     
     def open_from_dialog():
@@ -114,6 +126,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
         def select_problem():
             nonlocal domain_file, inst_file, viz
+            if not confirm_discard('domain', 'instance'):
+                return
             domain, instance = domain_var.get(), instance_var.get()
             manager = RDDLRepoManager()
             info = manager.get_problem(domain)
@@ -132,6 +146,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         if file_path is not None: 
             editor.file_format = textfile.write(
                 file_path, editor.content(), editor.file_format)
+            editor.mark_saved()
             status_bar.update_position()
             window.title(f'{caption}: {os.path.basename(file_path)}')
     
@@ -162,6 +177,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         '''Replaces the domain and instance by their grounded versions, as new files,
         in one step that undo takes back in each editor.'''
         nonlocal domain_file, inst_file, viz
+        if not confirm_discard('domain', 'instance'):
+            return
         for editor in (domain_editor, inst_editor):
             editor.clear_error()
         status_bar.show('Grounding the domain and instance...')
@@ -171,29 +188,76 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         except Exception as error:
             status_bar.show('Grounding failed')
             _show_error('Could not ground the domain and instance', error)
-            location = locate_error(str(error), domain_editor.content(),
-                                    inst_editor.content())
-            if location is not None:
-                {'domain': domain_editor, 'instance': inst_editor}[
-                    location.source].show_error(location.start, location.end)
+            highlight_error(str(error))
             return
         domain_file, inst_file, viz = None, None, None
-        domain_editor.replace_text(domain)
-        inst_editor.replace_text(instance)
+        for (editor, text) in ((domain_editor, domain), (inst_editor, instance)):
+            editor.replace_text(text)
+            editor.mark_saved(False)
         domain_pane.title('Domain: Untitled (grounded)')
         inst_pane.title('Instance: Untitled (grounded)')
         status_bar.show('Grounded the domain and instance')
 
     def save_instance_as():
-        nonlocal inst_file        
+        nonlocal inst_file
         inst_file = None
         save_instance()
+
+    def highlight_error(message):
+        '''Marks the part of the domain or instance a pyRDDLGym error points to.'''
+        location = locate_error(message, domain_editor.content(), inst_editor.content())
+        if location is not None:
+            {'domain': domain_editor, 'instance': inst_editor}[location.source].show_error(
+                location.start, location.end)
+
+    def check_problem():
+        '''Parses and compiles the domain and instance as they are in the editors.'''
+        if active_run is not None:
+            return
+        for editor in (domain_editor, inst_editor):
+            editor.clear_error()
+        status_bar.show('Checking the domain and instance...')
+        status_bar.update_idletasks()
+        try:
+            summary = check(domain_editor.content(), inst_editor.content())
+        except Exception as error:
+            status_bar.show(f'Check failed: {type(error).__name__}')
+            _show_error('Check found an error', error)
+            highlight_error(str(error))
+            return
+        status_bar.show(summary)
+
+    # UNSAVED changes: asked about before they are replaced or the window is closed
+    def confirm_discard(*names) -> bool:
+        '''Offers to save the unsaved changes of the named panes.'''
+        for name in names:
+            (pane, modified, save) = {
+                'domain': (domain_pane, domain_editor.modified, save_domain),
+                'instance': (inst_pane, inst_editor.modified, save_instance),
+                'policy': (policy_pane, policy_pane.code_modified, save_policy_as),
+            }[name]
+            if not modified():
+                continue
+            shown = pane.header.label.cget('text') or 'Untitled'
+            answer = messagebox.askyesnocancel(
+                'Unsaved changes', 
+                f'The {name} ({shown}) has unsaved changes.\n\nSave them first?', 
+                parent=root)
+            if answer is None:
+                return False
+            if answer:
+                save()
+                if modified():
+                    return False
+        return True
         
     active_run = None
     close_after_run = False
 
     def exit_application():
         nonlocal close_after_run
+        if not confirm_discard('domain', 'instance', 'policy'):
+            return
         if active_run is not None:
             close_after_run = True
             active_run.stop()
@@ -304,6 +368,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         messagebox.showerror(title, strip_ansi(f'{type(error).__name__}: {error}'))
 
     def load_policy_from_file():
+        if not confirm_discard('policy'):
+            return
         policy_file = fd.askopenfilename(filetypes=POLICY_FILES)
         if policy_file:
             try:
@@ -319,8 +385,14 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         if policy_file:
             try:
                 policy_pane.save(policy_file)
+                if policy_pane.mode == 'code':
+                    policy_editor.mark_saved()
             except Exception as error:
                 _show_error('Could not save policy', error)
+
+    def choose_policy(kind):
+        if confirm_discard('policy'):
+            policy_pane.show_form(kind)
 
     policy_pane.show_form('builtin')
 
@@ -410,69 +482,83 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         if save_dir:
             _evaluate(save_dir)
         
-    # domain menu
-    domain_menu_file = menu.add_cascade("Domain")
-    domain_menu_file_drop = MenuBarMenu(domain_menu_file)
-    domain_menu_file_drop.add_option(option='New Domain', command=create_domain)
-    domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(
-        option='Load Domain from rddlrepository...', command=open_from_dialog)
-    domain_menu_file_drop.add_option(
-        option='Load Domain from File...', command=open_domain)
-    domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(option='Save Domain', command=save_domain)
-    domain_menu_file_drop.add_option(option='Save Domain As...', command=save_domain_as)
-    domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(
-        option='Ground Domain and Instance', command=ground_problem)
-    domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(
-        option='Register Domain in rddlrepository...', command=register_domain)
-    domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(option='Exit', command=exit_application)
-    
-    # instance menu
-    inst_menu_file = menu.add_cascade("Instance")
-    inst_menu_file_drop = MenuBarMenu(inst_menu_file)
-    inst_menu_file_drop.add_option(option='New Instance', command=create_instance)
-    inst_menu_file_drop.add_separator()
-    inst_menu_file_drop.add_option(
-        option='Load Instance from File...', command=open_instance)
-    inst_menu_file_drop.add_separator()
-    inst_menu_file_drop.add_option(option='Save Instance', command=save_instance)
-    inst_menu_file_drop.add_option(option='Save Instance As...', command=save_instance_as)
-    inst_menu_file_drop.add_separator()
-    inst_menu_file_drop.add_option(
-        option='Register Instance in rddlrepository...', command=register_instance)
-    
-    # edit menu, for the editor that last had the focus
-    edit_menu = menu.add_cascade("Edit")
-    edit_menu_drop = MenuBarMenu(edit_menu)
-    edit_menu_drop.add_option(option='Undo', command=undo_text)
-    edit_menu_drop.add_option(option='Redo', command=redo_text)
-    edit_menu_drop.add_separator()
-    edit_menu_drop.add_option(option='Copy', command=copy_text)
-    edit_menu_drop.add_option(option='Cut', command=cut_text)
-    edit_menu_drop.add_option(option='Paste', command=paste_text)
+    # FIND, replace and go to line, in the editor in use
+    find_bars = {}
 
-    # agent menu: the policy file, the built-in baselines, and running the policy
-    agent_menu = menu.add_cascade("Agent")
-    agent_menu_drop = MenuBarMenu(agent_menu)
-    agent_menu_drop.add_option(
-        option='Load Policy from File...', command=load_policy_from_file)
-    agent_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
-    agent_menu_drop.add_option(option='Load Weights...', command=load_weights)
-    agent_menu_drop.add_option(option='Save Trained Weights...', command=save_weights)
-    agent_menu_drop.add_separator()
-    for (kind, title, _) in PROVIDERS:
-        agent_menu_drop.add_option(
-            option=title, command=lambda kind=kind: policy_pane.show_form(kind))
-    agent_menu_drop.add_separator()
-    agent_menu_drop.add_option(option='Evaluate', command=evaluate)
-    agent_menu_drop.add_option(option='Record', command=record)
-    agent_menu_drop.add_option(option='Stop', command=stop_run)
+    last_pane = 'domain'
 
-    # view menu
+    def active_pane():
+        '''The pane ('domain', 'instance' or 'policy') the keyboard focus is in, else
+        the pane it was last in.'''
+        try:
+            focus = root.focus_get()
+        except KeyError:
+            focus = None
+        path = str(focus) if focus is not None else ''
+        for (name, pane) in (('domain', domain_pane), ('instance', inst_pane),
+                             ('policy', policy_pane)):
+            if path.startswith(str(pane) + '.'):
+                return name
+        return last_pane
+
+    def show_active_pane(_=None):
+        '''Underlines the header of the active pane, which the shortcuts act on.'''
+        nonlocal last_pane
+        try:
+            last_pane = active_pane()
+            for (name, pane) in (('domain', domain_pane), ('instance', inst_pane),
+                                 ('policy', policy_pane)):
+                pane.header.set_active(name == last_pane)
+        except TclError:
+            pass
+
+    root.bind_all('<FocusIn>', lambda _: root.after_idle(show_active_pane), add='+')
+    show_active_pane()
+
+    def edit_target():
+        '''The editor that find and go to line act on: that of the pane in use, or the
+        domain's while the policy pane shows a form.'''
+        name = active_pane()
+        if name == 'policy' and policy_pane.mode != 'code':
+            name = 'domain'
+        return {'domain': domain_editor, 'instance': inst_editor,
+                'policy': policy_editor}[name]
+
+    def find_bar(editor):
+        if editor not in find_bars:
+            find_bars[editor] = FindBar(editor, editor.gutter)
+        return find_bars[editor]
+
+    def find_text():
+        find_bar(edit_target()).show()
+
+    def find_and_replace():
+        find_bar(edit_target()).show(replace=True)
+
+    def go_to_line():
+        editor = edit_target()
+        last = int(editor.index('end-1c').split('.')[0])
+        dialog = Dialog(root, 'Go to Line')
+        entry = dialog.field(f'Line (1–{last})', CTkEntry(dialog.body))
+        entry.insert(0, editor.index('insert').split('.')[0])
+
+        def go():
+            try:
+                line = int(entry.get().strip())
+            except ValueError:
+                entry.configure(border_color=RECORD_COLOR)
+                return
+            dialog.destroy()
+            index = f'{max(1, min(line, last))}.0'
+            editor.mark_set('insert', index)
+            editor.tag_remove('sel', '1.0', 'end')
+            editor.see(index)
+            editor.focus_set()
+
+        dialog.buttons('Go', go)
+        dialog.after(150, lambda: (entry.focus_set(), entry.select_range(0, 'end')))
+
+    # VIEW functions
     def toggle_theme():
         set_appearance_mode('light' if get_appearance_mode() == 'Dark' else 'dark')
 
@@ -488,25 +574,133 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         wrap_button.configure(fg_color=ThemeManager.theme['Palette']['hover']
                               if word_wrap else 'transparent')
 
+    # keyboard SHORTCUTS: those of files act on the pane in use (e.g. Ctrl+S saves the
+    # domain while editing it); undo, redo, cut, copy and paste are Tk's own
+    shortcuts = Shortcuts(root)
+    for editor in (domain_editor, inst_editor, policy_editor):
+        shortcuts.attach(editor)
+
+    def per_pane(domain_command, instance_command, policy_command=None):
+        def command():
+            chosen = {'domain': domain_command, 'instance': instance_command,
+                      'policy': policy_command}[active_pane()]
+            if chosen is not None:
+                chosen()
+        return command
+
+    NEW = shortcuts.add(per_pane(create_domain, create_instance), 'n', control=True)
+    OPEN = shortcuts.add(per_pane(open_domain, open_instance, load_policy_from_file),
+                         'o', control=True)
+    SAVE = shortcuts.add(per_pane(save_domain, save_instance, save_policy_as),
+                         's', control=True)
+    SAVE_AS = shortcuts.add(per_pane(save_domain_as, save_instance_as, save_policy_as),
+                            's', control=True, shift=True)
+    FIND = shortcuts.add(find_text, 'f', control=True)
+    if MAC:  # where Cmd+H hides the app
+        REPLACE = shortcuts.add(find_and_replace, 'f', control=True, alt=True)
+        GOTO = shortcuts.add(go_to_line, 'l', control=True)
+    else:
+        REPLACE = shortcuts.add(find_and_replace, 'h', control=True)
+        GOTO = shortcuts.add(go_to_line, 'g', control=True)
+    CHECK = shortcuts.add(check_problem, 'F7')
+    RUN = shortcuts.add(evaluate, 'F5')
+    STOP = shortcuts.add(stop_run, 'F5', shift=True)
+    WRAP = shortcuts.add(toggle_word_wrap, 'z', alt=True)
+    UNDO = label('z', control=True)
+    REDO = label('y', control=True) if WINDOWS else label('z', control=True, shift=True)
+    (CUT, COPY, PASTE) = (label(key, control=True) for key in 'xcv')
+
+    # domain menu
+    domain_menu_file = menu.add_cascade("Domain")
+    domain_menu_file_drop = MenuBarMenu(domain_menu_file)
+    domain_menu_file_drop.add_option('New Domain', create_domain, NEW)
+    domain_menu_file_drop.add_separator()
+    domain_menu_file_drop.add_option(
+        'Load Domain from rddlrepository...', open_from_dialog)
+    domain_menu_file_drop.add_option('Load Domain from File...', open_domain, OPEN)
+    domain_menu_file_drop.add_separator()
+    domain_menu_file_drop.add_option('Save Domain', save_domain, SAVE)
+    domain_menu_file_drop.add_option('Save Domain As...', save_domain_as, SAVE_AS)
+    domain_menu_file_drop.add_separator()
+    domain_menu_file_drop.add_option('Check Domain and Instance', check_problem, CHECK)
+    domain_menu_file_drop.add_option('Ground Domain and Instance', ground_problem)
+    domain_menu_file_drop.add_separator()
+    domain_menu_file_drop.add_option(
+        'Register Domain in rddlrepository...', register_domain)
+    domain_menu_file_drop.add_separator()
+    domain_menu_file_drop.add_option('Exit', exit_application)
+
+    # instance menu
+    inst_menu_file = menu.add_cascade("Instance")
+    inst_menu_file_drop = MenuBarMenu(inst_menu_file)
+    inst_menu_file_drop.add_option('New Instance', create_instance, NEW)
+    inst_menu_file_drop.add_separator()
+    inst_menu_file_drop.add_option('Load Instance from File...', open_instance, OPEN)
+    inst_menu_file_drop.add_separator()
+    inst_menu_file_drop.add_option('Save Instance', save_instance, SAVE)
+    inst_menu_file_drop.add_option('Save Instance As...', save_instance_as, SAVE_AS)
+    inst_menu_file_drop.add_separator()
+    inst_menu_file_drop.add_option(
+        'Register Instance in rddlrepository...', register_instance)
+
+    # edit menu, for the editor that last had the focus
+    edit_menu = menu.add_cascade("Edit")
+    edit_menu_drop = MenuBarMenu(edit_menu)
+    edit_menu_drop.add_option('Undo', undo_text, UNDO)
+    edit_menu_drop.add_option('Redo', redo_text, REDO)
+    edit_menu_drop.add_separator()
+    edit_menu_drop.add_option('Cut', cut_text, CUT)
+    edit_menu_drop.add_option('Copy', copy_text, COPY)
+    edit_menu_drop.add_option('Paste', paste_text, PASTE)
+    edit_menu_drop.add_separator()
+    edit_menu_drop.add_option('Find...', find_text, FIND)
+    edit_menu_drop.add_option('Replace...', find_and_replace, REPLACE)
+    edit_menu_drop.add_option('Go to Line...', go_to_line, GOTO)
+
+    # agent menu: the policy file, the built-in baselines, and running the policy
+    agent_menu = menu.add_cascade("Agent")
+    agent_menu_drop = MenuBarMenu(agent_menu)
+    agent_menu_drop.add_option('Load Policy from File...', load_policy_from_file, OPEN)
+    agent_menu_drop.add_option('Save Policy As...', save_policy_as, SAVE)
+    agent_menu_drop.add_option('Load Weights...', load_weights)
+    agent_menu_drop.add_option('Save Trained Weights...', save_weights)
+    agent_menu_drop.add_separator()
+    for (kind, title, _) in PROVIDERS:
+        agent_menu_drop.add_option(title, lambda kind=kind: choose_policy(kind))
+    agent_menu_drop.add_separator()
+    agent_menu_drop.add_option('Evaluate', evaluate, RUN)
+    agent_menu_drop.add_option('Record', record)
+    agent_menu_drop.add_option('Stop', stop_run, STOP)
+
+    # view menu
     view_menu = menu.add_cascade("View")
     view_menu_drop = MenuBarMenu(view_menu)
-    view_menu_drop.add_option(option='Toggle Word Wrap', command=toggle_word_wrap)
-    view_menu_drop.add_option(option='Toggle Light/Dark Theme', command=toggle_theme)
+    view_menu_drop.add_option('Toggle Word Wrap', toggle_word_wrap, WRAP)
+    view_menu_drop.add_option('Toggle Light/Dark Theme', toggle_theme)
 
-    # buttons: on the right of the menu bar and of the header of each pane
+    # buttons: on the right of the menu bar, in groups, and of the header of each pane
     menu.grid_columnconfigure(menu.num, weight=1)
-    edit_buttons = (('undo', 'Undo', undo_text), ('redo', 'Redo', redo_text),
-                    ('cut', 'Cut', cut_text), ('copy', 'Copy', copy_text),
-                    ('paste', 'Paste', paste_text))
-    for (column, (icon, tooltip, command)) in enumerate(edit_buttons, menu.num + 1):
-        IconButton(menu, icon, tooltip, command).grid(
-            row=0, column=column, padx=(0, 2 if icon != 'redo' else 10), pady=2)
-    column = menu.num + 1 + len(edit_buttons)
-    wrap_button = IconButton(menu, 'wrap', 'Toggle word wrap', toggle_word_wrap)
-    wrap_button.grid(row=0, column=column, padx=(8, 2), pady=2)
-    theme_button = IconButton(
-        menu, 'moon', 'Toggle light/dark theme', toggle_theme, dark_name='sun')
-    theme_button.grid(row=0, column=column + 1, padx=(0, 6), pady=2)
+    menu_buttons = (
+        (('undo', f'Undo ({UNDO})', undo_text), ('redo', f'Redo ({REDO})', redo_text)),
+        (('cut', f'Cut ({CUT})', cut_text), ('copy', f'Copy ({COPY})', copy_text),
+         ('paste', f'Paste ({PASTE})', paste_text)),
+        (('find', f'Find ({FIND})', find_text),
+         ('replace', f'Replace ({REPLACE})', find_and_replace),
+         ('goto', f'Go to line ({GOTO})', go_to_line)),
+        (('wrap', f'Toggle word wrap ({WRAP})', toggle_word_wrap),
+         ('moon', 'Toggle light/dark theme', toggle_theme)),
+    )
+    column = menu.num + 1
+    for (g, group) in enumerate(menu_buttons):
+        for (k, (icon, tooltip, command)) in enumerate(group):
+            button = IconButton(menu, icon, tooltip, command,
+                                dark_name='sun' if icon == 'moon' else None)
+            last = k == len(group) - 1
+            button.grid(row=0, column=column, pady=2, padx=(
+                0, (6 if g == len(menu_buttons) - 1 else 10) if last else 2))
+            column += 1
+            if icon == 'wrap':
+                wrap_button = button
 
     for (header, noun, commands) in (
             (domain_pane.header, 'domain',
@@ -515,13 +709,16 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
              (create_instance, open_instance, save_instance, save_instance_as))):
         for (icon, tooltip, command) in zip(
                 ('new', 'load', 'save', 'save_as'),
-                (f'New {noun}', f'Load {noun} from file', f'Save {noun}',
-                 f'Save {noun} as'), commands):
+                (f'New {noun} ({NEW})', f'Load {noun} from file ({OPEN})',
+                 f'Save {noun} ({SAVE})', f'Save {noun} as ({SAVE_AS})'), commands):
             header.add_button(icon, tooltip, command)
             if header is domain_pane.header and icon == 'load':
                 header.add_button(
-                    'repository', 'Load domain and instance from rddlrepository', 
+                    'repository', 'Load domain and instance from rddlrepository',
                     open_from_dialog)
+    domain_pane.header.add_gap()
+    domain_pane.header.add_button(
+        'check', f'Check domain and instance ({CHECK})', check_problem)
 
     policy_header = policy_pane.header
     policy_header.add_button('load', 'Load policy from file', load_policy_from_file)
@@ -533,10 +730,10 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         'save_weights', 'Save trained weights', save_weights)
     policy_header.add_gap()
     run_buttons = [
-        policy_header.add_button('run', 'Evaluate', evaluate),
+        policy_header.add_button('run', f'Evaluate ({RUN})', evaluate),
         policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)
     ]
-    stop_button = policy_header.add_button('stop', 'Stop', stop_run)
+    stop_button = policy_header.add_button('stop', f'Stop ({STOP})', stop_run)
 
     def update_buttons():
         running = active_run is not None

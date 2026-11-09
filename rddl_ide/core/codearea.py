@@ -91,6 +91,10 @@ class CTkCodeViewer(CTkTextbox):
         self.bind("<KeyRelease>", lambda *_: self.apply())
         self.bind('<KeyPress>', self._word_boundary)
         self.file_format = FileFormat()
+        self.saved_text = ''
+        self._modified = False
+        self._check_pending = False
+        self._textbox.bind('<<Modified>>', self._schedule_check, add='+')
         self._style_tags()
 
     def _word_boundary(self, event):
@@ -107,6 +111,7 @@ class CTkCodeViewer(CTkTextbox):
         self.edit_reset()
         self.file_format = file_format
         self.apply()
+        self.mark_saved()
         self._textbox.event_generate('<<TextReplaced>>')
 
     def replace_text(self, text):
@@ -125,6 +130,35 @@ class CTkCodeViewer(CTkTextbox):
     def content(self):
         '''The text, without the new line that Tk always adds at the end.'''
         return self.get('1.0', 'end-1c')
+
+    # ===========================================================================
+    # unsaved changes
+    # ===========================================================================
+
+    def modified(self) -> bool:
+        '''Whether the text differs from the text last loaded or saved.'''
+        return self.saved_text is None or self.content() != self.saved_text
+
+    def mark_saved(self, saved: bool=True) -> None:
+        '''Takes the text as saved, or as never saved (e.g. a new grounded domain).'''
+        self.saved_text = self.content() if saved else None
+        self._check_modified()
+
+    def _schedule_check(self, _=None):
+        if not self._check_pending:
+            self._check_pending = True
+            self.after_idle(self._check_modified)
+
+    def _check_modified(self):
+        '''Generates <<ModifiedChanged>> when the text becomes modified or unmodified.'''
+        self._check_pending = False
+        try:
+            modified = self.modified()
+            if modified != self._modified:
+                self._modified = modified
+                self._textbox.event_generate('<<ModifiedChanged>>')
+        except TclError:
+            pass
 
     def _style_tags(self):
         '''Colors the syntax and error tags for the current theme.'''
@@ -250,7 +284,8 @@ class CodeEditor:
             window, font=(my_font, FONT_SIZE), language=language, theme=theme, wrap='none')
         self.text = text_area
         
-        LineNumbers(window, text_area).pack(side='left', fill='y')
+        text_area.gutter = LineNumbers(window, text_area)
+        text_area.gutter.pack(side='left', fill='y')
         text_area.pack(expand=True, fill='both')        
         CTkScrollbar(window, command=text_area.xview)
         CTkScrollbar(window, command=text_area.yview)

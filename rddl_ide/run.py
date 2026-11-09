@@ -30,8 +30,10 @@ class EditorPane(CTkFrame):
         self._pending = None
         text = self.editor.text
         for sequence in ('<KeyRelease>', '<ButtonRelease-1>', '<<Undo>>', '<<Redo>>',
-                         '<<TextReplaced>>'):
+                         '<<TextReplaced>>', '<<Selection>>'):
             text.bind(sequence, self._schedule_crumbs, add='+')
+        text.bind('<<ModifiedChanged>>',
+                  lambda _: self.header.set_modified(text.modified()), add='+')
 
     def _schedule_crumbs(self, _=None):
         '''Updates the breadcrumb once typing or moving pauses, as it reads the text.'''

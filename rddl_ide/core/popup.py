@@ -9,7 +9,7 @@ from typing import Callable, List, Optional, Tuple, Union
 from customtkinter import CTkFont, CTkOptionMenu, ThemeManager, get_appearance_mode
 
 SEPARATOR = None
-Item = Union[Tuple[str, Callable[[], None]], None]
+Item = Union[Tuple[str, Callable[[], None]], Tuple[str, Callable[[], None], str], None]
 
 # sizes before DPI scaling
 ROW_HEIGHT = 28
@@ -18,6 +18,7 @@ SEPARATOR_HEIGHT = 9
 TEXT_INSET = 12
 CHECK_WIDTH = 22
 RIGHT_INSET = 28
+SHORTCUT_GAP = 40
 FONT_SIZE = 14
 SCROLLBAR_WIDTH = 6
 SCREEN_MARGIN = 8
@@ -108,8 +109,12 @@ class PopupMenu:
         self.scrollbar_width = s(SCROLLBAR_WIDTH) if self.scrollable else 0
 
         labels = [item[0] for item in items if item is not SEPARATOR]
+        shortcuts = [_shortcut(item) for item in items if item is not SEPARATOR]
+        widest_shortcut = max(
+            [self.font.measure(text) for text in shortcuts if text], default=0)
+        shortcut_room = s(SHORTCUT_GAP) + widest_shortcut if widest_shortcut else 0
         width = max([min_width, s(160)] + [
-            text_x + self.font.measure(label) + s(RIGHT_INSET)
+            text_x + self.font.measure(label) + shortcut_room + s(RIGHT_INSET)
             for label in labels
         ]) + self.scrollbar_width
 
@@ -144,6 +149,10 @@ class PopupMenu:
             middle = (row_top + row_bottom) // 2
             canvas.create_text(text_x, middle, anchor='w', text=items[i][0],
                                font=self.font, fill=palette('text'))
+            if _shortcut(items[i]):
+                canvas.create_text(row_right - s(TEXT_INSET), middle, anchor='e',
+                                   text=_shortcut(items[i]), font=self.font,
+                                   fill=palette('text_muted'))
             if checkable and items[i][0] == selected:
                 canvas.create_text(s(TEXT_INSET), middle, anchor='w', text='✓',
                                    font=self.font, fill=palette('accent'))
@@ -383,6 +392,10 @@ class ChoiceMenu(CTkOptionMenu):
             selected=self._current_value, min_width=self.winfo_width())
 
 
+def _shortcut(item) -> Optional[str]:
+    return item[2] if len(item) > 2 else None
+
+
 class MenuBarMenu:
     '''A menu of a CTkMenuBar, opened by its button.'''
 
@@ -397,8 +410,11 @@ class MenuBarMenu:
                          text_color=ThemeManager.theme['Palette']['text'])
         MenuBarMenu._menus.append(self)
 
-    def add_option(self, option: str, command: Callable[[], None]) -> None:
-        self.items.append((option, command))
+    def add_option(self, option: str, command: Callable[[], None], 
+                   shortcut: Optional[str]=None) -> None:
+        '''Adds an item, with the text of its keyboard shortcut if it has one.'''
+        self.items.append(
+            (option, command) if shortcut is None else (option, command, shortcut))
 
     def add_separator(self) -> None:
         self.items.append(SEPARATOR)

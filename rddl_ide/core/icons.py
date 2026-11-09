@@ -200,6 +200,43 @@ def _wrap(pen):
     pen.line((3.5, 18.5), (8.5, 18.5))
 
 
+def _find(pen):
+    pen.circle((10.5, 10.5), 7)
+    pen.line((15.5, 15.5), (20.5, 20.5))
+
+
+def _replace(pen):
+    pen.line((3, 3), (10, 3), (10, 10), (3, 10), closed=True, radius=1.5)
+    pen.line((14, 14), (21, 14), (21, 21), (14, 21), closed=True, radius=1.5)
+    pen.line((13.5, 6.5), (17.5, 6.5), (17.5, 10.5), radius=2)
+    pen.line((15.5, 8.5), (17.5, 10.5), (19.5, 8.5))
+
+
+def _goto(pen):
+    for y in (5.5, 12, 18.5):
+        pen.line((13, y), (21, y))
+    pen.line((2.5, 12), (9, 12))
+    pen.line((6, 9), (9, 12), (6, 15))
+
+
+def _check(pen):
+    pen.circle((12, 12), 9.5)
+    pen.line((7.5, 12.5), (10.5, 15.5), (16.5, 9))
+
+
+def _up(pen):
+    pen.line((6.5, 14.5), (12, 9), (17.5, 14.5))
+
+
+def _down(pen):
+    pen.line((6.5, 9.5), (12, 15), (17.5, 9.5))
+
+
+def _close(pen):
+    pen.line((6.5, 6.5), (17.5, 17.5))
+    pen.line((17.5, 6.5), (6.5, 17.5))
+
+
 def _moon(pen):
     (center, radius) = ((11.5, 12.5), 9)
     (cut, cut_radius) = ((17, 7), 7)
@@ -224,7 +261,9 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'save_as': _save_as,
             'load_weights': _load_weights, 'save_weights': _save_weights, 'run': _run,
             'record': _record, 'stop': _stop, 'undo': _undo, 'redo': _redo, 'cut': _cut,
-            'copy': _copy, 'paste': _paste, 'wrap': _wrap, 'moon': _moon, 'sun': _sun}
+            'copy': _copy, 'paste': _paste, 'find': _find, 'replace': _replace,
+            'goto': _goto, 'check': _check, 'up': _up, 'down': _down, 'close': _close,
+            'wrap': _wrap, 'moon': _moon, 'sun': _sun}
 
 
 @lru_cache(maxsize=None)

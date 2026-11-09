@@ -25,10 +25,19 @@ class PolicyPane(CTkFrame):
         self.mode = None  # 'code', 'form' or 'unavailable'
         self.provider = self.state = None
         self.changed = []
+        self.text.bind('<<ModifiedChanged>>', lambda _: self._show_modified(), add='+')
         
     def _changed(self):
+        self._show_modified()
         for callback in self.changed:
             callback()
+
+    def code_modified(self) -> bool:
+        '''Whether the pane shows code with unsaved changes.'''
+        return self.mode == 'code' and self.text.modified()
+
+    def _show_modified(self):
+        self.header.set_modified(self.code_modified())
 
     def title(self, text):
         self.header.configure(text=text)
