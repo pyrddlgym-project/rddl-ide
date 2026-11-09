@@ -2,7 +2,9 @@ import os
 import sys
 import traceback
 from tkinter import TclError, messagebox
-from customtkinter import StringVar, CTkEntry, ThemeManager
+from customtkinter import (
+    StringVar, CTkButton, CTkCheckBox, CTkEntry, CTkFrame, ThemeManager
+)
 from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
@@ -10,9 +12,11 @@ from rddl_ide.core.checking import check
 from rddl_ide.core.dialog import Dialog
 from rddl_ide.core.findbar import FindBar
 from rddl_ide.core.errorlocation import locate_error, strip_ansi
-from rddl_ide.core.execution import evaluate_policy
+from rddl_ide.core.execution import VISUALIZERS, RunOptions, evaluate_policy
+from rddl_ide.core.graphview import DependencyWindow
 from rddl_ide.core.grounding import ground
 from rddl_ide.core.icons import RECORD_COLOR, IconButton
+from rddl_ide.core.outline import definitions, line_column
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
 from rddl_ide.core.shortcuts import MAC, WINDOWS, Shortcuts, label
@@ -452,8 +456,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                 update()
             try:
                 message = evaluate_policy(
-                    domain_file, inst_file, build_policy, required_env_args, viz, record, 
-                    progress)
+                    domain_file, inst_file, build_policy, required_env_args, viz, record,
+                    progress, run_options)
             finally:
                 active_run = None
                 if progress.policy is not None and provider is not None and \
@@ -481,6 +485,121 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         save_dir = fd.askdirectory()
         if save_dir:
             _evaluate(save_dir)
+
+    run_options = RunOptions()
+
+    def edit_run_options():
+        '''Asks for the number of episodes, the seed, the visualizer, the simulation log
+        and whether action constraints are enforced, for the runs that follow.'''
+        dialog = Dialog(root, 'Run Options')
+        palette = ThemeManager.theme['Palette']
+        episodes = dialog.field('Episodes', CTkEntry(dialog.body))
+        episodes.insert(0, str(run_options.episodes))
+        seed = dialog.field('Seed', CTkEntry(dialog.body, placeholder_text='Random'))
+        if run_options.seed is not None:
+            seed.insert(0, str(run_options.seed))
+        visualizer = StringVar(dialog, VISUALIZERS[run_options.visualizer])
+        dialog.field('Visualizer', ChoiceMenu(
+            dialog.body, variable=visualizer, values=list(VISUALIZERS.values())))
+        log_row = dialog.field(
+            'Simulation log', CTkFrame(dialog.body, fg_color='transparent'))
+        log_file = CTkEntry(log_row, width=100, placeholder_text='None')
+        log_file.pack(side='left', fill='x', expand=True)
+        if run_options.log_file:
+            log_file.insert(0, run_options.log_file)
+
+        def browse():
+            path = fd.asksaveasfilename(
+                parent=dialog, initialfile='simulation_log.csv', defaultextension='.csv',
+                filetypes=[('CSV File', '*.csv')])
+            if path:
+                log_file.delete(0, 'end')
+                log_file.insert(0, path)
+
+        CTkButton(log_row, text='Browse...', width=0, fg_color='transparent',
+                  hover_color=palette['hover'], text_color=palette['text'],
+                  border_width=1, border_color=palette['field_border'],
+                  command=browse).pack(side='left', padx=(6, 0))
+        enforce = dialog.field('Action constraints', CTkCheckBox(
+            dialog.body, text='Stop the run when one is violated', checkbox_width=18,
+            checkbox_height=18, border_width=1))
+        if run_options.enforce_constraints:
+            enforce.select()
+
+        def whole_number(entry, minimum=None):
+            '''(valid, the integer typed or None if left empty where allowed).'''
+            text = entry.get().strip()
+            try:
+                value = None if text == '' and minimum is None else int(text)
+                if value is None or minimum is None or value >= minimum:
+                    entry.configure(border_color=palette['field_border'])
+                    return (True, value)
+            except ValueError:
+                pass
+            entry.configure(border_color=RECORD_COLOR)
+            return (False, None)
+
+        def save():
+            nonlocal run_options
+            (episodes_ok, count) = whole_number(episodes, 1)
+            (seed_ok, seed_value) = whole_number(seed)
+            if not (episodes_ok and seed_ok):
+                return
+            chosen = next(key for (key, name) in VISUALIZERS.items()
+                          if name == visualizer.get())
+            run_options = RunOptions(count, seed_value, chosen,
+                                     log_file.get().strip() or None, bool(enforce.get()))
+            dialog.destroy()
+            status_bar.show(describe_run_options())
+
+        dialog.buttons('Save', save)
+
+    def describe_run_options():
+        options = run_options
+        parts = [f'{options.episodes} episode{"s" if options.episodes > 1 else ""}',
+                 'random seed' if options.seed is None else f'seed {options.seed}',
+                 f'{VISUALIZERS[options.visualizer]} visualizer']
+        if options.log_file:
+            parts.append(f'log to {os.path.basename(options.log_file)}')
+        if options.enforce_constraints:
+            parts.append('action constraints enforced')
+        return 'Run options: ' + ', '.join(parts)
+
+    # DEPENDENCY graph of the domain
+    graph_window = None
+
+    def show_dependencies():
+        nonlocal graph_window
+        if graph_window is not None and graph_window.winfo_exists():
+            graph_window.refresh()
+            graph_window.deiconify()
+            graph_window.lift()
+            graph_window.focus_force()
+            return
+        graph_window = DependencyWindow(
+            root, lambda: (domain_editor.content(), inst_editor.content()),
+            go_to_definition)
+
+    def go_to_definition(name):
+        '''Selects where the domain defines the fluent (its CPF, else its declaration)
+        or the reward.'''
+        text = domain_editor.content()
+        found = definitions(text)
+        if name == 'reward':
+            offset = found.get('', {}).get('reward')
+        else:
+            offset = found.get('cpfs', {}).get(name, found.get('cdfs', {}).get(name))
+            if offset is None:
+                offset = found.get('pvariables', {}).get(name.rstrip("'"))
+        if offset is None:
+            status_bar.show(f'Could not find where the domain defines {name}')
+            return
+        start = line_column(text, offset)
+        domain_editor.tag_remove('sel', '1.0', 'end')
+        domain_editor.tag_add('sel', start, f'{start}+{len(name)}c')
+        domain_editor.mark_set('insert', start)
+        domain_editor.see(start)
+        domain_editor.focus_set()
         
     # FIND, replace and go to line, in the editor in use
     find_bars = {}
@@ -624,6 +743,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option('Check Domain and Instance', check_problem, CHECK)
     domain_menu_file_drop.add_option('Ground Domain and Instance', ground_problem)
+    domain_menu_file_drop.add_option('Show Dependency Graph', show_dependencies)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(
         'Register Domain in rddlrepository...', register_domain)
@@ -671,6 +791,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     agent_menu_drop.add_option('Evaluate', evaluate, RUN)
     agent_menu_drop.add_option('Record', record)
     agent_menu_drop.add_option('Stop', stop_run, STOP)
+    agent_menu_drop.add_separator()
+    agent_menu_drop.add_option('Run Options...', edit_run_options)
 
     # view menu
     view_menu = menu.add_cascade("View")
@@ -719,6 +841,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     domain_pane.header.add_gap()
     domain_pane.header.add_button(
         'check', f'Check domain and instance ({CHECK})', check_problem)
+    domain_pane.header.add_button('graph', 'Show dependency graph', show_dependencies)
 
     policy_header = policy_pane.header
     policy_header.add_button('load', 'Load policy from file', load_policy_from_file)
@@ -734,6 +857,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)
     ]
     stop_button = policy_header.add_button('stop', f'Stop ({STOP})', stop_run)
+    policy_header.add_gap()
+    policy_header.add_button('options', 'Run options', edit_run_options)
 
     def update_buttons():
         running = active_run is not None

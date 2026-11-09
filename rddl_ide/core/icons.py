@@ -237,6 +237,34 @@ def _close(pen):
     pen.line((17.5, 6.5), (6.5, 17.5))
 
 
+def _graph(pen):
+    '''Two boxes joined into a third, as in a flow diagram.'''
+    for (x, y) in ((2.5, 3), (2.5, 15.5), (15, 9.25)):
+        pen.line((x, y), (x + 6.5, y), (x + 6.5, y + 5.5), (x, y + 5.5), closed=True,
+                 radius=1.5)
+    pen.line((9, 5.75), (12, 5.75), (12, 18.25), (9, 18.25), radius=1.5)
+    pen.line((12, 12), (15, 12))
+
+
+def _options(pen):
+    '''Three sliders.'''
+    for (y, knob) in ((5.5, 15), (12, 8), (18.5, 13)):
+        pen.line((3, y), (knob - 2.75, y))
+        pen.line((knob + 2.75, y), (21, y))
+        pen.circle((knob, y), 2.75)
+
+
+def _refresh(pen):
+    '''An arrow going clockwise around a circle.'''
+    (center, radius, end) = ((12, 12.5), 7.5, 300)
+    pen.line(*_arc(center, (radius, radius), 30, end))
+    tip = _arc(center, (radius, radius), end, end, steps=1)[0]
+    back = math.radians(end) - math.pi / 2  # against the direction of the arrow
+    (left, right) = ((tip[0] + 4.5 * math.cos(back + turn),
+                      tip[1] + 4.5 * math.sin(back + turn)) for turn in (0.8, -0.8))
+    pen.line(left, tip, right)
+
+
 def _moon(pen):
     (center, radius) = ((11.5, 12.5), 9)
     (cut, cut_radius) = ((17, 7), 7)
@@ -263,7 +291,8 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'record': _record, 'stop': _stop, 'undo': _undo, 'redo': _redo, 'cut': _cut,
             'copy': _copy, 'paste': _paste, 'find': _find, 'replace': _replace,
             'goto': _goto, 'check': _check, 'up': _up, 'down': _down, 'close': _close,
-            'wrap': _wrap, 'moon': _moon, 'sun': _sun}
+            'wrap': _wrap, 'moon': _moon, 'sun': _sun, 'graph': _graph,
+            'options': _options, 'refresh': _refresh}
 
 
 @lru_cache(maxsize=None)

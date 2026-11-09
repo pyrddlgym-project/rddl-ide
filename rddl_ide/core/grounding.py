@@ -9,11 +9,9 @@ FLUENT_SEPARATOR = '___'
 OBJECT_SEPARATOR = '__'
 
 
-def ground(domain: str, instance: str) -> Tuple[str, str]:
-    '''The grounded domain and instance of the RDDL texts.'''
+def lifted_model(domain: str, instance: str):
+    '''The RDDLLiftedModel of pyRDDLGym of the RDDL texts.'''
     from pyRDDLGym.core.compiler.model import RDDLLiftedModel
-    from pyRDDLGym.core.debug.decompiler import RDDLDecompiler
-    from pyRDDLGym.core.grounder import RDDLGrounder
     from pyRDDLGym.core.parser.parser import RDDLParser
     from pyRDDLGym.core.parser.reader import RDDLReader
 
@@ -25,7 +23,15 @@ def ground(domain: str, instance: str) -> Tuple[str, str]:
         text = RDDLReader(*paths).rddltxt
     parser = RDDLParser(lexer=None, verbose=False)
     parser.build()
-    model = RDDLLiftedModel(parser.parse(text))
+    return RDDLLiftedModel(parser.parse(text))
+
+
+def ground(domain: str, instance: str) -> Tuple[str, str]:
+    '''The grounded domain and instance of the RDDL texts.'''
+    from pyRDDLGym.core.debug.decompiler import RDDLDecompiler
+    from pyRDDLGym.core.grounder import RDDLGrounder
+
+    model = lifted_model(domain, instance)
     grounded = RDDLGrounder(model.ast).ground()
     decompiler = RDDLDecompiler()
     return legal_names(decompiler.decompile_domain(grounded),

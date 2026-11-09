@@ -136,8 +136,11 @@ class RunProgress:
         self._describe = describe
         self.refresh()
 
-    def step(self, step: int, horizon: int, reward, total) -> None:
-        self.episode_text = f'Step {step}/{horizon} · reward {number(reward)} · ' \
+    def step(self, step: int, horizon: int, reward, total,
+             episode: Optional[Tuple[int, int]]=None) -> None:
+        '''Reports a step of the episode, which is (number, of how many) if several.'''
+        prefix = '' if episode is None else f'Episode {episode[0]}/{episode[1]} · '
+        self.episode_text = f'{prefix}Step {step}/{horizon} · reward {number(reward)} · ' \
                             f'return {number(total)}'
         self.refresh()
 

@@ -1,6 +1,6 @@
 '''Where a position is in the structure of a RDDL domain or instance.'''
 import re
-from typing import List, NamedTuple, Optional
+from typing import Dict, List, NamedTuple, Optional
 
 MAX_LENGTH = 40
 
@@ -117,3 +117,45 @@ def line_column(text: str, offset: int) -> str:
     '''The Tk text index of the offset in the text.'''
     line_start = text.rfind('\n', 0, offset) + 1
     return f'{text.count(chr(10), 0, offset) + 1}.{offset - line_start}'
+
+
+def definitions(text: str) -> Dict[str, Dict[str, int]]:
+    '''Where the statements of the sections of a domain start, by section and the first
+    name in the statement, e.g. {'cpfs': {"rlevel'": 812}, 'pvariables': {'rlevel': 301},
+    '': {'reward': 1520}}, where '' is the section of the statements of the domain block
+    itself (as reward and the requirements are).'''
+    result: Dict[str, Dict[str, int]] = {}
+    stack = [_Frame(None)]
+    sections = []
+    for match in _TOKEN.finditer(text):
+        token = match.group()
+        if token.startswith('//'):
+            continue
+        frame = stack[-1]
+        if token == '}':
+            if len(stack) > 1:
+                stack.pop()
+                if len(stack) == 1:
+                    stack[0].end_statement()
+            continue
+        if token == ';':
+            frame.end_statement()
+            continue
+        if frame.start is None:
+            frame.start = match.start()
+        if token == '{':
+            stack.append(_Frame(frame.last))
+            if len(stack) == 3 and frame.last is not None and frame.last is frame.first:
+                sections.append(stack[-1])
+        elif token[0].isalpha():
+            frame.last = Crumb(token, match.start())
+            if frame.first is None:
+                frame.first = frame.last
+                if len(stack) == 2:
+                    section = ''
+                elif len(stack) == 3 and sections and frame is sections[-1]:
+                    section = frame.header.text
+                else:
+                    continue
+                result.setdefault(section, {}).setdefault(token, frame.start)
+    return result
