@@ -32,10 +32,7 @@ def dependency_graph(domain: str, instance: str,
     model = lifted_model(domain, instance)
     analysis = RDDLLevelAnalysis(model)
     graph: Dict[str, List[str]] = analysis.build_call_graph(
-        include_non_fluents=include_non_fluents)
-    reward: Dict[str, set] = {}
-    analysis._update_call_graph(reward, REWARD, model.reward, include_non_fluents)
-    graph[REWARD] = sorted(reward.get(REWARD, ()))
+        include_non_fluents=include_non_fluents, include_reward=True)
     levels = analysis.compute_levels()
 
     def node(name, kind, column):
@@ -44,7 +41,8 @@ def dependency_graph(domain: str, instance: str,
         params = model.variable_params.get(name) or []
         signature = name + (f'({", ".join(params)})' if params else '')
         prange = model.variable_ranges.get(name)
-        return Node(name, kind, column, f'{signature} : {prange}' if prange else signature)
+        return Node(
+            name, kind, column, f'{signature} : {prange}' if prange else signature)
 
     types = model.variable_types
     shown = set(INPUTS if include_non_fluents else INPUTS[1:])

@@ -51,10 +51,15 @@ class StatusLine(CTkFrame):
         self.label = CTkLabel(self, text=text, anchor='w', padx=12, height=28,
                               text_color=palette['text'], font=self._font)
         self.label.pack(side='left', fill='x', expand=True)
+        self._details = Tooltip(self.label, '')
 
-    def show(self, text: str) -> None:
+    def show(self, text: str, details: str='') -> None:
+        '''Shows the text, with the details in a tooltip if there are any.'''
+        self._details.text = details
+        if not details:
+            self._details._hide()
         try:
-            self.label.configure(text=text)
+            self.label.configure(text=text + ('  ⓘ' if details else ''))
         except TclError:
             pass
 

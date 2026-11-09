@@ -4,7 +4,7 @@ import ctypes
 import sys
 import tkinter
 from tkinter import font as tkfont
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, Collection, List, Optional, Tuple, Union
 
 from customtkinter import CTkFont, CTkOptionMenu, ThemeManager, get_appearance_mode
 
@@ -62,12 +62,14 @@ def work_area(widget: tkinter.Misc, x: int, y: int) -> Tuple[int, int, int, int]
 
 class PopupMenu:
     '''Shows items (label, command) and SEPARATORs below the anchor widget until one is
-    chosen, a click lands outside, Escape is pressed or the window moves.'''
+    chosen, a click lands outside, Escape is pressed or the window moves. The items at
+    the disabled indices are shown muted and cannot be chosen.'''
 
     def __init__(self, anchor: tkinter.Misc, items: List[Item], 
                  selected: Optional[str]=None,
                  min_width: int=0, on_close: Optional[Callable[[], None]]=None,
-                 on_pointer: Optional[Callable[[int, int], bool]]=None):
+                 on_pointer: Optional[Callable[[int, int], bool]]=None,
+                 disabled: Collection[int]=()):
         self.anchor = anchor
         self.items = items
         self.on_close = on_close
@@ -148,7 +150,8 @@ class PopupMenu:
                 fill='', outline='')
             middle = (row_top + row_bottom) // 2
             canvas.create_text(text_x, middle, anchor='w', text=items[i][0],
-                               font=self.font, fill=palette('text'))
+                               font=self.font,
+                               fill=palette('text_muted' if i in disabled else 'text'))
             if _shortcut(items[i]):
                 canvas.create_text(row_right - s(TEXT_INSET), middle, anchor='e',
                                    text=_shortcut(items[i]), font=self.font,
@@ -156,6 +159,7 @@ class PopupMenu:
             if checkable and items[i][0] == selected:
                 canvas.create_text(s(TEXT_INSET), middle, anchor='w', text='✓',
                                    font=self.font, fill=palette('accent'))
+        self.rows = [row for row in self.rows if row[2] not in disabled]
         for middle in separators:
             canvas.create_line(
                 s(10), middle, width - s(10), middle, fill=palette('border'))

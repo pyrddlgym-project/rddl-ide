@@ -225,13 +225,13 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         status_bar.show('Checking the domain and instance...')
         status_bar.update_idletasks()
         try:
-            summary = check(domain_editor.content(), inst_editor.content())
+            result = check(domain_editor.content(), inst_editor.content())
         except Exception as error:
             status_bar.show(f'Check failed: {type(error).__name__}')
             _show_error('Check found an error', error)
             highlight_error(str(error))
             return
-        status_bar.show(summary)
+        status_bar.show(result.summary, result.details)
 
     # UNSAVED changes: asked about before they are replaced or the window is closed
     def confirm_discard(*names) -> bool:

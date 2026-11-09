@@ -289,6 +289,12 @@ def _run_to_end(pen):
     pen.line((19, 5.5), (19, 18.5))
 
 
+def _more(pen):
+    '''Three dots in a row.'''
+    for x in (5, 12, 19):
+        pen.circle((x, 12), 1.75, fill=True)
+
+
 def _moon(pen):
     (center, radius) = ((11.5, 12.5), 9)
     (cut, cut_radius) = ((17, 7), 7)
@@ -317,7 +323,7 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'goto': _goto, 'check': _check, 'up': _up, 'down': _down, 'close': _close,
             'wrap': _wrap, 'moon': _moon, 'sun': _sun, 'graph': _graph,
             'options': _options, 'refresh': _refresh, 'restart': _restart,
-            'step': _step, 'run_to_end': _run_to_end}
+            'step': _step, 'run_to_end': _run_to_end, 'more': _more}
 
 
 @lru_cache(maxsize=None)
@@ -381,7 +387,7 @@ class Tooltip:
         widget.bind('<ButtonPress>', lambda _: self._hide(), add=True)
 
     def _schedule(self, _=None):
-        if self._pending is None and self.window is None:
+        if self.text and self._pending is None and self.window is None:
             self._pending = self.widget.after(TOOLTIP_DELAY, self._show)
 
     def _inside(self):
@@ -415,14 +421,17 @@ class Tooltip:
                 family=CTkFont().cget('family'), size=-round(TOOLTIP_FONT_SIZE * scale))
             label = tkinter.Label(
                 window, 
-                text=self.text, bg=color(palette['popup']), fg=color(palette['text']), 
-                font=text_font, padx=round(8 * scale), pady=round(3 * scale))
+                text=self.text, bg=color(palette['popup']), fg=color(palette['text']),
+                font=text_font, padx=round(8 * scale), pady=round(3 * scale), justify='left')
             label.pack(padx=1, pady=1)
             x = self.widget.winfo_rootx()
             y = self.widget.winfo_rooty() + self.widget.winfo_height() + round(4 * scale)
             window.update_idletasks()
-            right = work_area(self.widget, x, y)[2]
+            (_, top, right, bottom) = work_area(self.widget, x, y)
             x = max(0, min(x, right - window.winfo_reqwidth()))
+            if y + window.winfo_reqheight() > bottom:
+                y = max(top, self.widget.winfo_rooty() - round(4 * scale) -
+                        window.winfo_reqheight())
             window.geometry(f'+{x}+{y}')
         except tkinter.TclError:
             self._hide()
