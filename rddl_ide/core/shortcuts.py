@@ -31,6 +31,10 @@ class Shortcuts:
         self.window = window
         self._commands: Dict[Key, Callable[[], None]] = {}
         window.bind_all('<KeyPress>', self.dispatch, add='+')
+        for sequence in window.bind_class('all'):
+            if 'Release' not in sequence and (
+                    sequence.startswith('<Key-') or sequence.endswith('-Key>')):
+                window.bind_all(sequence, self.dispatch, add='+')
 
     def add(self, command: Callable[[], None], key: str, control: bool=False,
             shift: bool=False, alt: bool=False) -> str:

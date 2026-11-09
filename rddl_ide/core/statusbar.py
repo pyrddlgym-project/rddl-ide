@@ -38,34 +38,46 @@ def environment() -> Tuple[str, str]:
     return (short, f'{sys.executable}\n{pyrddlgym}')
 
 
-class StatusBar(CTkFrame):
-    '''A line of text on the frame color with a hairline above it.'''
+class StatusLine(CTkFrame):
+    '''A line of text on the frame color with a hairline above it, at the bottom of a
+    window.'''
 
-    def __init__(self, master):
+    def __init__(self, master, text: str=''):
         palette = ThemeManager.theme['Palette']
         super().__init__(master, corner_radius=0, fg_color=palette['chrome'])
         CTkFrame(self, height=1, corner_radius=0, fg_color=palette['border']).pack(
             side='top', fill='x')
         self._font = CTkFont(size=13)
+        self.label = CTkLabel(self, text=text, anchor='w', padx=12, height=28,
+                              text_color=palette['text'], font=self._font)
+        self.label.pack(side='left', fill='x', expand=True)
+
+    def show(self, text: str) -> None:
+        try:
+            self.label.configure(text=text)
+        except TclError:
+            pass
+
+
+class StatusBar(StatusLine):
+    '''The status line of the main window, with the cursor position, file format and
+    Python environment on the right.'''
+
+    def __init__(self, master):
+        super().__init__(master, 'Ready')
         self._viewer = None
         (short, full) = environment()
         Tooltip(self._segment(short), full)
         self.newline = self._segment('')
         self.encoding = self._segment('')
         self.position = self._segment('')
-        self.label = CTkLabel(self, text='Ready', anchor='w', padx=12, height=28,
-                              text_color=palette['text'], font=self._font)
-        self.label.pack(side='left', fill='x', expand=True)
 
     def _segment(self, text: str) -> CTkLabel:
         label = CTkLabel(
             self, text=text, padx=SEGMENT_PADDING, height=28,
             text_color=ThemeManager.theme['Palette']['text'], font=self._font)
-        label.pack(side='right')
+        label.pack(side='right', before=self.label)
         return label
-
-    def show(self, text: str) -> None:
-        self.label.configure(text=text)
 
     def track(self, viewer) -> None:
         '''Shows the cursor position and file format of the code viewer.'''

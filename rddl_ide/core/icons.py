@@ -254,15 +254,39 @@ def _options(pen):
         pen.circle((knob, y), 2.75)
 
 
-def _refresh(pen):
-    '''An arrow going clockwise around a circle.'''
+def _circular_arrow(pen, mirrored=False):
+    '''An arrow going clockwise around a circle, or counterclockwise if mirrored.'''
     (center, radius, end) = ((12, 12.5), 7.5, 300)
-    pen.line(*_arc(center, (radius, radius), 30, end))
-    tip = _arc(center, (radius, radius), end, end, steps=1)[0]
+    points = _arc(center, (radius, radius), 30, end)
+    tip = points[-1]
     back = math.radians(end) - math.pi / 2  # against the direction of the arrow
     (left, right) = ((tip[0] + 4.5 * math.cos(back + turn),
                       tip[1] + 4.5 * math.sin(back + turn)) for turn in (0.8, -0.8))
-    pen.line(left, tip, right)
+    flip = (lambda p: (24 - p[0], p[1])) if mirrored else (lambda p: p)
+    pen.line(*map(flip, points))
+    pen.line(flip(left), flip(tip), flip(right))
+
+
+def _refresh(pen):
+    _circular_arrow(pen)
+
+
+def _restart(pen):
+    _circular_arrow(pen, mirrored=True)
+
+
+def _step(pen):
+    '''Step over: an arrow arching over a dot.'''
+    points = _arc((12, 13), (7.5, 7), 180, 360)
+    pen.line(*points)
+    tip = points[-1]
+    pen.line((tip[0] - 3.25, tip[1] - 3.25), tip, (tip[0] + 3.25, tip[1] - 3.25))
+    pen.circle((12, 19.5), 2.25, fill=True)
+
+
+def _run_to_end(pen):
+    pen.polygon((4.5, 5), (15, 12), (4.5, 19), radius=1.5)
+    pen.line((19, 5.5), (19, 18.5))
 
 
 def _moon(pen):
@@ -292,7 +316,8 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'copy': _copy, 'paste': _paste, 'find': _find, 'replace': _replace,
             'goto': _goto, 'check': _check, 'up': _up, 'down': _down, 'close': _close,
             'wrap': _wrap, 'moon': _moon, 'sun': _sun, 'graph': _graph,
-            'options': _options, 'refresh': _refresh}
+            'options': _options, 'refresh': _refresh, 'restart': _restart,
+            'step': _step, 'run_to_end': _run_to_end}
 
 
 @lru_cache(maxsize=None)

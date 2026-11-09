@@ -1,5 +1,4 @@
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -10,10 +9,8 @@ from typing import NamedTuple, Optional
 import pyRDDLGym
 from pyRDDLGym.core.visualizer.movie import MovieGenerator
 
+from rddl_ide.core.errorlocation import strip_ansi
 from rddl_ide.core.statusbar import RunProgress, RunStopped, number
-
-_ANSI_CODE = re.compile(r'\033\[[0-9;]*m')
-
 
 def policy_from_code(source):
     '''Runs the source of a custom policy, which must define build_policy(env) and
@@ -66,7 +63,33 @@ class _Episodes:
 def _summary(episodes: _Episodes, stats, count: int) -> str:
     if count == 1:
         return f'Done · {episodes.steps} steps · return {number(episodes.total)}'
-    return f'Done · {count} episodes · return {number(stats["mean"])} '            f'± {number(stats["std"])} (min {number(stats["min"])}, '            f'max {number(stats["max"])})'
+    return f'Done · {count} episodes · return {number(stats["mean"])} ' \
+           f'± {number(stats["std"])} (min {number(stats["min"])}, ' \
+           f'max {number(stats["max"])})'
+
+
+def make_environment(domain_file, inst_file, required_env_args, viz,
+                     options: RunOptions, log_path: str, record=None):
+    '''The environment of a run, made with the arguments returned by required_env_args()
+    and the options, and whether it is rendered.'''
+    env_args = dict(required_env_args())
+    if options.enforce_constraints:
+        env_args['enforce_action_constraints'] = True
+    if options.log_file:
+        env_args['log_path'] = log_path
+    env = pyRDDLGym.make(domain=domain_file, instance=inst_file, **env_args)
+    try:
+        render = options.visualizer != 'none' or record is not None
+        if options.visualizer not in ('default', 'none'):
+            viz = options.visualizer
+        movie_gen = None
+        if record is not None:
+            movie_gen = MovieGenerator(record, env.model.domain_name, 9999)
+        env.set_visualizer(viz, movie_gen=movie_gen)
+    except BaseException:
+        close_env(env)
+        raise
+    return (env, render)
 
 
 def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz, record,
@@ -80,19 +103,8 @@ def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz
         try:
             try:
                 progress.note('Preparing the environment and the policy...')
-                env_args = dict(required_env_args())
-                if options.enforce_constraints:
-                    env_args['enforce_action_constraints'] = True
-                if options.log_file:
-                    env_args['log_path'] = log_path
-                env = pyRDDLGym.make(domain=domain_file, instance=inst_file, **env_args)
-                render = options.visualizer != 'none' or record is not None
-                if options.visualizer not in ('default', 'none'):
-                    viz = options.visualizer
-                movie_gen = None
-                if record is not None:
-                    movie_gen = MovieGenerator(record, env.model.domain_name, 9999)
-                env.set_visualizer(viz, movie_gen=movie_gen)
+                (env, render) = make_environment(domain_file, inst_file, required_env_args,
+                                                 viz, options, log_path, record)
                 policy = progress.policy = build_policy(env)
                 episodes = _Episodes(env, progress, options.episodes)
                 stats = policy.evaluate(env, episodes=options.episodes, verbose=True,
@@ -100,23 +112,23 @@ def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz
                 env.close()
                 env = None
                 summary = _summary(episodes, stats, options.episodes)
-                progress.finish(summary + _save_log(log_path, options.log_file))
+                progress.finish(summary + save_log(log_path, options.log_file))
                 return None
             except Exception as error:
                 print(traceback.format_exc(), file=sys.stderr)
-                _close(env)
+                close_env(env)
                 env = None
-                progress.finish('Stopped by an error' + _save_log(log_path, options.log_file))
+                progress.finish('Stopped by an error' + save_log(log_path, options.log_file))
                 message = str(error)
-                messagebox.showerror('pyRDDLGym error', _ANSI_CODE.sub('', message))
+                messagebox.showerror('pyRDDLGym error', strip_ansi(message))
                 return message
         except RunStopped:
-            _close(env)
-            _save_log(log_path, options.log_file)
+            close_env(env)
+            save_log(log_path, options.log_file)
             return None
 
 
-def _save_log(log_path, log_file) -> str:
+def save_log(log_path, log_file) -> str:
     '''Moves the simulation log pyRDDLGym wrote to the file chosen, and says so.'''
     written = f'{log_path}_log.csv'
     if not log_file or not os.path.exists(written):
@@ -128,7 +140,7 @@ def _save_log(log_path, log_file) -> str:
     return f' · log saved to {os.path.basename(log_file)}'
 
 
-def _close(env) -> None:
+def close_env(env) -> None:
     '''Closes the environment (and its visualizer) of a run that did not finish.'''
     if env is not None:
         try:

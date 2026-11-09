@@ -20,7 +20,9 @@ from rddl_ide.core.outline import definitions, line_column
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
 from rddl_ide.core.shortcuts import MAC, WINDOWS, Shortcuts, label
-from rddl_ide.core.statusbar import RunProgress
+from rddl_ide.core.statusbar import RunProgress, RunStopped
+from rddl_ide.core.stepperview import StepperWindow
+from rddl_ide.core.stepping import Stepper
 from rddl_ide.core import textfile
 
 
@@ -262,13 +264,21 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         nonlocal close_after_run
         if not confirm_discard('domain', 'instance', 'policy'):
             return
-        if active_run is not None:
-            close_after_run = True
+        close_after_run = True
+        finish_exit()
+
+    def finish_exit():
+        '''Closes the stepper and stops the run going, if any, before the window.'''
+        if stepper_window is not None:
+            stepper_window.close()
+        elif active_run is not None:
             active_run.stop()
         else:
             root.destroy()
 
     def stop_run():
+        if stepper_window is not None:
+            stepper_window.stop()
         if active_run is not None:
             active_run.stop()
 
@@ -466,7 +476,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                 for update in buttons_changed:
                     update()
             if close_after_run:
-                root.destroy()
+                finish_exit()
                 return
             if progress.stopped:
                 progress.show_stopped()
@@ -485,6 +495,86 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         save_dir = fd.askdirectory()
         if save_dir:
             _evaluate(save_dir)
+
+    # STEPPING through an episode of the policy, in a window of its own
+    stepper_window = None
+
+    def step_through():
+        '''Opens the stepper for the policy shown, or takes a step in the one open.'''
+        nonlocal active_run, trained, stepper_window
+        if stepper_window is not None:
+            stepper_window.lift()
+            stepper_window.step()
+            return
+        if active_run is not None:
+            return
+        save_domain()
+        save_instance()
+        if domain_file is None or inst_file is None:
+            return
+        for editor in (domain_editor, inst_editor):
+            editor.clear_error()
+        progress = RunProgress(status_bar)
+        try:
+            build_policy, required_env_args = policy_pane.policy(progress)
+        except Exception as error:
+            _show_error('Policy error', error)
+            return
+        provider = policy_pane.provider
+        active_run = progress
+        for update in buttons_changed:
+            update()
+        stepper = None
+        try:
+            progress.note('Preparing the environment and the policy...')
+            stepper = Stepper(domain_file, inst_file, build_policy, required_env_args,
+                              viz, run_options, progress)
+        except RunStopped:
+            pass
+        except Exception as error:
+            status_bar.show(f'Could not start stepping: {type(error).__name__}')
+            _show_error('pyRDDLGym error', error)
+            highlight_error(str(error))
+        finally:
+            active_run = None
+            if progress.policy is not None and provider is not None and \
+                    provider.weight_files is not None:
+                trained = (provider, progress.policy)
+            for update in buttons_changed:
+                update()
+        if stepper is None or close_after_run:
+            if stepper is not None:
+                stepper.close()
+            if close_after_run:
+                finish_exit()
+            elif progress.stopped:
+                progress.show_stopped()
+            return
+
+        def busy(running):
+            nonlocal active_run
+            if running:
+                active_run = progress
+            elif active_run is progress:
+                active_run = None
+            for update in buttons_changed:
+                update()
+
+        def closed(note):
+            nonlocal stepper_window
+            stepper_window = None
+            try:
+                status_bar.show('Stopped stepping' + note)
+            except TclError:
+                pass
+            if close_after_run:
+                root.after_idle(finish_exit)
+
+        status_bar.show('Stepping through an episode')
+        stepper_window = StepperWindow(
+            root, stepper, progress, f'Step Through: {stepper.model.domain_name}',
+            busy=busy, allowed=lambda: active_run is None, on_error=highlight_error,
+            on_close=closed)
 
     run_options = RunOptions()
 
@@ -723,6 +813,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         GOTO = shortcuts.add(go_to_line, 'g', control=True)
     CHECK = shortcuts.add(check_problem, 'F7')
     RUN = shortcuts.add(evaluate, 'F5')
+    STEP = shortcuts.add(step_through, 'F10')
     STOP = shortcuts.add(stop_run, 'F5', shift=True)
     WRAP = shortcuts.add(toggle_word_wrap, 'z', alt=True)
     UNDO = label('z', control=True)
@@ -789,6 +880,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         agent_menu_drop.add_option(title, lambda kind=kind: choose_policy(kind))
     agent_menu_drop.add_separator()
     agent_menu_drop.add_option('Evaluate', evaluate, RUN)
+    agent_menu_drop.add_option('Step Through...', step_through, STEP)
     agent_menu_drop.add_option('Record', record)
     agent_menu_drop.add_option('Stop', stop_run, STOP)
     agent_menu_drop.add_separator()
@@ -854,6 +946,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     policy_header.add_gap()
     run_buttons = [
         policy_header.add_button('run', f'Evaluate ({RUN})', evaluate),
+        policy_header.add_button('step', f'Step through ({STEP})', step_through),
         policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)
     ]
     stop_button = policy_header.add_button('stop', f'Stop ({STOP})', stop_run)

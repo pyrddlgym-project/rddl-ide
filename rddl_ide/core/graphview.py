@@ -13,6 +13,7 @@ from rddl_ide.core.appicon import set_icon
 from rddl_ide.core.dependencies import Graph, Node, REWARD, dependency_graph
 from rddl_ide.core.errorlocation import strip_ansi
 from rddl_ide.core.icons import IconButton
+from rddl_ide.core.statusbar import StatusLine
 from rddl_ide.core.titlebar import match_title_bar
 
 # sizes, before scaling
@@ -113,11 +114,11 @@ class DependencyWindow(CTkToplevel):
 
     def __init__(self, master, source: Source, go_to: Callable[[str], None]):
         palette = ThemeManager.theme['Palette']
-        super().__init__(master, fg_color=palette['content'])
+        super().__init__(master)
         self.title('Dependency Graph')
         self.transient(master)
         self.after(250, lambda: set_icon(self))
-        match_title_bar(self, 'content')
+        match_title_bar(self)
         self.source = source
         self.go_to = go_to
         self.graph: Optional[Graph] = None
@@ -140,9 +141,7 @@ class DependencyWindow(CTkToplevel):
         IconButton(bar, 'refresh', 'Rebuild from the domain and instance',
                    self.refresh).pack(side='right', padx=4)
 
-        self.footer = CTkLabel(self, text=HINT, anchor='w', height=26, padx=10,
-                               font=text_font, text_color=palette['text_muted'],
-                               fg_color=palette['chrome'])
+        self.footer = StatusLine(self, HINT)
         self.footer.pack(side='bottom', fill='x')
         area = CTkFrame(self, corner_radius=0, fg_color='transparent')
         area.pack(side='top', fill='both', expand=True)
@@ -204,7 +203,7 @@ class DependencyWindow(CTkToplevel):
         canvas = self.canvas
         canvas.delete('all')
         canvas.configure(bg=self._color(palette['content']))
-        self.footer.configure(text=HINT)
+        self.footer.show(HINT)
         self._draw_legend()
         scale = ScalingTracker.get_widget_scaling(self)
         self._font = font.Font(
@@ -313,15 +312,14 @@ class DependencyWindow(CTkToplevel):
         self._hovered = node.name if node is not None else None
         self.canvas.configure(cursor='hand2' if node is not None else '')
         if node is None:
-            self.footer.configure(text=HINT)
+            self.footer.show(HINT)
         else:
             uses = [dep for (dep, name) in self.graph.edges if name == node.name]
             used_by = [name for (dep, name) in self.graph.edges if dep == node.name]
             kind = KINDS.get(node.kind, (node.kind,))[0]
-            self.footer.configure(
-                text=f'{kind}  {node.signature}   ·   depends on: '
-                     f'{", ".join(uses) or "nothing"}   ·   used by: '
-                     f'{", ".join(used_by) or "nothing"}')
+            self.footer.show(f'{kind}  {node.signature}   ·   depends on: '
+                             f'{", ".join(uses) or "nothing"}   ·   used by: '
+                             f'{", ".join(used_by) or "nothing"}')
         self._paint()
 
     def _draw_legend(self) -> None:
