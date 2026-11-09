@@ -32,7 +32,7 @@ def solver_parameters() -> List[Field]:
 class GurobiProvider(Provider):
 
     kind = 'gurobi-online'
-    title = 'Gurobi (online)'
+    title = 'Gurobi (replanning)'
 
     def __init__(self) -> None:
         self.plans = concrete_subclasses(planner, planner.GurobiPlan)

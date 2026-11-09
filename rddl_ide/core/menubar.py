@@ -29,7 +29,7 @@ from rddl_ide.core import textfile
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                              domain_editor, inst_editor, status_bar):
     policy_editor = policy_pane.text
-    domain_file, inst_file, viz = None, None, None
+    domain_file, inst_file, viz, problem = None, None, None, None
     
     # load template RDDL
     abs_path = os.path.dirname(os.path.abspath(__file__))
@@ -42,10 +42,10 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     # FILE functions
     def create_domain():
-        nonlocal domain_file, viz
+        nonlocal domain_file, viz, problem
         if not confirm_discard('domain'):
             return
-        domain_file, viz = None, None
+        domain_file, viz, problem = None, None, None
         domain_pane.title('Domain: Untitled')
         domain_editor.set_text(DOMAIN_TEMPLATE)
         
@@ -63,13 +63,13 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             editor.set_text(*textfile.read(file_path))
         
     def open_domain():
-        nonlocal domain_file, viz
+        nonlocal domain_file, viz, problem
         if not confirm_discard('domain'):
             return
         path = fd.askopenfilename(
             defaultextension='.rddl', filetypes=[('RDDL File', '*.rddl*')])
         if path:
-            domain_file, viz = path, None
+            domain_file, viz, problem = path, None, None
             _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
 
     def open_instance():
@@ -131,7 +131,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             dialog.destroy()
 
         def select_problem():
-            nonlocal domain_file, inst_file, viz
+            nonlocal domain_file, inst_file, viz, problem
             if not confirm_discard('domain', 'instance'):
                 return
             domain, instance = domain_var.get(), instance_var.get()
@@ -139,7 +139,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             info = manager.get_problem(domain)
             domain_file = info.get_domain()
             inst_file = info.get_instance(instance)
-            viz = info.get_visualizer()   
+            viz, problem = info.get_visualizer(), domain
                      
             _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
             _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)            
@@ -182,7 +182,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     def ground_problem():
         '''Replaces the domain and instance by their grounded versions, as new files,
         in one step that undo takes back in each editor.'''
-        nonlocal domain_file, inst_file, viz
+        nonlocal domain_file, inst_file, viz, problem
         if not confirm_discard('domain', 'instance'):
             return
         for editor in (domain_editor, inst_editor):
@@ -196,7 +196,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             _show_error('Could not ground the domain and instance', error)
             highlight_error(str(error))
             return
-        domain_file, inst_file, viz = None, None, None
+        domain_file, inst_file, viz, problem = None, None, None, None
         for (editor, text) in ((domain_editor, domain), (inst_editor, instance)):
             editor.replace_text(text)
             editor.mark_saved(False)
@@ -407,6 +407,29 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     def choose_policy(kind):
         if confirm_discard('policy'):
             policy_pane.show_form(kind)
+
+    JAXPLAN_METHODS = {
+        'jaxplan-offline': (('slp', 'straight-line plan'), ('drp', 'deep reactive policy')),
+        'jaxplan-online': (('replan', 'replanning'),)}
+
+    def choose_jaxplan(method):
+        '''JaxPlan with the config pyRDDLGym-jax ships for the method on the domain loaded
+        from rddlrepository, else with its default config of the method.'''
+        if not confirm_discard('policy'):
+            return
+        try:
+            from rddl_ide.core.settings.jaxplan import recommended_config
+            path = recommended_config(method, problem)
+            policy_pane.load(
+                path, 'jaxplan-online' if method == 'replan' else 'jaxplan-offline')
+        except Exception as error:
+            _show_error('Could not load the recommended config', error)
+            return
+        name = os.path.basename(path)
+        note = '' if name == f'{problem}_{method}.cfg' else \
+            ' (the domain is not from rddlrepository)' if problem is None else \
+            f' (pyRDDLGym-jax has no {method} config for {problem})'
+        status_bar.show(f'JaxPlan settings from {name}{note}')
 
     policy_pane.show_form('builtin')
 
@@ -870,7 +893,11 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     agent_menu_drop.add_option('Save Trained Weights...', save_weights)
     agent_menu_drop.add_separator()
     for (kind, title, _) in PROVIDERS:
-        agent_menu_drop.add_option(title, lambda kind=kind: choose_policy(kind))
+        for (method, name) in JAXPLAN_METHODS.get(kind, ()):
+            agent_menu_drop.add_option(
+                f'JaxPlan ({name})', lambda method=method: choose_jaxplan(method))
+        if kind not in JAXPLAN_METHODS:
+            agent_menu_drop.add_option(title, lambda kind=kind: choose_policy(kind))
     agent_menu_drop.add_separator()
     agent_menu_drop.add_option('Evaluate', evaluate, RUN)
     agent_menu_drop.add_option('Step Through...', step_through, STEP)

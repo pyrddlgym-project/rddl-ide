@@ -95,12 +95,13 @@ class PolicyPane(CTkFrame):
         else:
             raise RuntimeError('There is no policy to save.')
 
-    def load(self, path):
+    def load(self, path, kind=None):
+        '''Shows the policy file: a config in the form of its kind (detected if None).'''
         (content, file_format) = textfile.read(path)
         if not path.lower().endswith('.cfg'):
             self.show_code(content, os.path.basename(path), file_format)
             return
-        kind = registry.detect_kind(content)
+        kind = kind or registry.detect_kind(content)
         if kind is None:
             raise ValueError(f'{os.path.basename(path)} is not a config of any of the '
                              f'baselines: its sections are not recognized.')

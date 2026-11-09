@@ -37,6 +37,17 @@ OPTIMIZER_KWARGS = 'optimizer_kwargs'
 
 TRACE_MODULES = (planner, plan, logic)
 
+# the configs that ship with pyRDDLGym-jax: <problem>_<method>.cfg and default_<method>.cfg
+CONFIGS = os.path.join(os.path.dirname(pyRDDLGym_jax.__file__), 'examples', 'configs')
+
+
+def recommended_config(method: str, problem: Optional[str]=None) -> str:
+    '''The config of pyRDDLGym-jax for the method (slp, drp or replan) on the
+    rddlrepository problem, picked as run_plan.py does: else default_<method>.cfg.'''
+    path = os.path.join(CONFIGS, f'{problem}_{method}.cfg')
+    return path if problem and os.path.isfile(path) else \
+        os.path.join(CONFIGS, f'default_{method}.cfg')
+
 
 @functools.lru_cache(maxsize=None)
 def optax_optimizers() -> List[str]:
@@ -198,9 +209,7 @@ class JaxPlanProvider(Provider):
     # ===========================================================================
 
     def initial_state(self) -> FormState:
-        name = 'default_replan.cfg' if self.online else 'default_slp.cfg'
-        path = os.path.join(
-            os.path.dirname(pyRDDLGym_jax.__file__), 'examples', 'configs', name)
+        path = recommended_config('replan' if self.online else 'slp')
         if os.path.isfile(path):
             with open(path) as file:
                 return self.from_config(file.read())

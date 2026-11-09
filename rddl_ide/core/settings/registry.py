@@ -34,7 +34,7 @@ PROVIDERS: List[Tuple[str, str, Callable[[], Provider]]] = [
     ('builtin', 'Built-in agent', _builtin),
     ('jaxplan-offline', 'JaxPlan (offline)', _jaxplan_offline),
     ('jaxplan-online', 'JaxPlan (online)', _jaxplan_online),
-    ('gurobi-online', 'Gurobi (online)', _gurobi_online),
+    ('gurobi-online', 'Gurobi (replanning)', _gurobi_online),
     ('sb3', 'Stable-Baselines3', _sb3),
 ]
 
