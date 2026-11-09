@@ -109,6 +109,19 @@ class CTkCodeViewer(CTkTextbox):
         self.apply()
         self._textbox.event_generate('<<TextReplaced>>')
 
+    def replace_text(self, text):
+        '''Replaces the whole text as one step, which undo takes back.'''
+        self.edit_separator()
+        self._textbox.configure(autoseparators=False)
+        try:
+            self.delete('1.0', 'end')
+            self.insert('1.0', text)
+        finally:
+            self._textbox.configure(autoseparators=True)
+        self.edit_separator()
+        self.apply()
+        self._textbox.event_generate('<<TextReplaced>>')
+
     def content(self):
         '''The text, without the new line that Tk always adds at the end.'''
         return self.get('1.0', 'end-1c')

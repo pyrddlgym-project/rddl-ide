@@ -7,8 +7,9 @@ from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
 from rddl_ide.core.dialog import Dialog
-from rddl_ide.core.errorlocation import locate_error
+from rddl_ide.core.errorlocation import locate_error, strip_ansi
 from rddl_ide.core.execution import evaluate_policy
+from rddl_ide.core.grounding import ground
 from rddl_ide.core.icons import RECORD_COLOR, IconButton
 from rddl_ide.core.popup import ChoiceMenu, MenuBarMenu
 from rddl_ide.core.settings.registry import PROVIDERS
@@ -157,6 +158,32 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         domain_file = None
         save_domain()
     
+    def ground_problem():
+        '''Replaces the domain and instance by their grounded versions, as new files,
+        in one step that undo takes back in each editor.'''
+        nonlocal domain_file, inst_file, viz
+        for editor in (domain_editor, inst_editor):
+            editor.clear_error()
+        status_bar.show('Grounding the domain and instance...')
+        status_bar.update_idletasks()
+        try:
+            (domain, instance) = ground(domain_editor.content(), inst_editor.content())
+        except Exception as error:
+            status_bar.show('Grounding failed')
+            _show_error('Could not ground the domain and instance', error)
+            location = locate_error(str(error), domain_editor.content(),
+                                    inst_editor.content())
+            if location is not None:
+                {'domain': domain_editor, 'instance': inst_editor}[
+                    location.source].show_error(location.start, location.end)
+            return
+        domain_file, inst_file, viz = None, None, None
+        domain_editor.replace_text(domain)
+        inst_editor.replace_text(instance)
+        domain_pane.title('Domain: Untitled (grounded)')
+        inst_pane.title('Instance: Untitled (grounded)')
+        status_bar.show('Grounded the domain and instance')
+
     def save_instance_as():
         nonlocal inst_file        
         inst_file = None
@@ -274,7 +301,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
     def _show_error(title, error):
         print(traceback.format_exc(), file=sys.stderr)
-        messagebox.showerror(title, f'{type(error).__name__}: {error}')
+        messagebox.showerror(title, strip_ansi(f'{type(error).__name__}: {error}'))
 
     def load_policy_from_file():
         policy_file = fd.askopenfilename(filetypes=POLICY_FILES)
@@ -397,6 +424,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     domain_menu_file_drop.add_option(option='Save Domain As...', command=save_domain_as)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(
+        option='Ground Domain and Instance', command=ground_problem)
+    domain_menu_file_drop.add_separator()
+    domain_menu_file_drop.add_option(
         option='Register Domain in rddlrepository...', command=register_domain)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(option='Exit', command=exit_application)
@@ -452,9 +482,15 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
     # buttons: on the right of the menu bar and of the header of each pane
     menu.grid_columnconfigure(menu.num, weight=1)
+    edit_buttons = (('undo', 'Undo', undo_text), ('redo', 'Redo', redo_text),
+                    ('cut', 'Cut', cut_text), ('copy', 'Copy', copy_text),
+                    ('paste', 'Paste', paste_text))
+    for (column, (icon, tooltip, command)) in enumerate(edit_buttons, menu.num + 1):
+        IconButton(menu, icon, tooltip, command).grid(
+            row=0, column=column, padx=(0, 2 if icon != 'redo' else 10), pady=2)
     theme_button = IconButton(
         menu, 'moon', 'Toggle light/dark theme', toggle_theme, dark_name='sun')
-    theme_button.grid(row=0, column=menu.num + 1, padx=(0, 6), pady=2)
+    theme_button.grid(row=0, column=menu.num + 1 + len(edit_buttons), padx=(8, 6), pady=2)
 
     for (header, noun, commands) in (
             (domain_pane.header, 'domain',
@@ -466,6 +502,10 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                 (f'New {noun}', f'Load {noun} from file', f'Save {noun}',
                  f'Save {noun} as'), commands):
             header.add_button(icon, tooltip, command)
+            if header is domain_pane.header and icon == 'load':
+                header.add_button(
+                    'repository', 'Load domain and instance from rddlrepository', 
+                    open_from_dialog)
 
     policy_header = policy_pane.header
     policy_header.add_button('load', 'Load policy from file', load_policy_from_file)

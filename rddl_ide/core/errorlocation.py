@@ -19,6 +19,11 @@ _NUMBERED_BLOCKS = {
 }
 
 
+def strip_ansi(text: str) -> str:
+    '''The text without the terminal color codes of pyRDDLGym's messages.'''
+    return _ANSI_CODE.sub('', text)
+
+
 class Location(NamedTuple):
     source: str  # 'domain' or 'instance'
     start: str   # Tk text indices, 'line.column'

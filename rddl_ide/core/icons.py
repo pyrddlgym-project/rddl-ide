@@ -120,6 +120,23 @@ def _save_as(pen):
              radius=0.5)
 
 
+def _arc(center, radii, start, end, steps=24):
+    '''Points of an elliptic arc, with angles in degrees (0 to the right, 90 down).'''
+    return [(center[0] + radii[0] * math.cos(math.radians(a)),
+             center[1] + radii[1] * math.sin(math.radians(a)))
+            for a in (start + (end - start) * k / steps for k in range(steps + 1))]
+
+
+def _repository(pen):
+    '''A database: a cylinder of stacked disks.'''
+    (left, right, rx, ry) = (4, 20, 8, 3)
+    pen.line(*_arc((12, 5.5), (rx, ry), 0, 360, steps=48), closed=True)
+    pen.line((left, 5.5), (left, 18.5))
+    pen.line((right, 5.5), (right, 18.5))
+    pen.line(*_arc((12, 12), (rx, ry), 0, 180))
+    pen.line(*_arc((12, 18.5), (rx, ry), 0, 180))
+
+
 def _tray(pen):
     pen.line((3, 15), (3, 20.5), (21, 20.5), (21, 15), radius=1.5)
 
@@ -148,6 +165,34 @@ def _stop(pen):
     pen.polygon((6.5, 6.5), (17.5, 6.5), (17.5, 17.5), (6.5, 17.5), radius=2)
 
 
+def _undo(pen):
+    pen.line((19.5, 19), (19.5, 8.5), (4.5, 8.5), radius=6)
+    pen.line((8.5, 4.5), (4.5, 8.5), (8.5, 12.5))
+
+
+def _redo(pen):
+    pen.line((4.5, 19), (4.5, 8.5), (19.5, 8.5), radius=6)
+    pen.line((15.5, 4.5), (19.5, 8.5), (15.5, 12.5))
+
+
+def _cut(pen):
+    pen.circle((6.5, 17.5), 3.5)
+    pen.circle((17.5, 17.5), 3.5)
+    pen.line((8.6, 14.6), (17, 2.5))
+    pen.line((15.4, 14.6), (7, 2.5))
+
+
+def _copy(pen):
+    pen.line((4.5, 15.5), (2.5, 15.5), (2.5, 2.5), (15.5, 2.5), (15.5, 4.5), radius=2)
+    pen.line((8.5, 8.5), (21.5, 8.5), (21.5, 21.5), (8.5, 21.5), closed=True, radius=2)
+
+
+def _paste(pen):
+    pen.line((8, 4.5), (4.5, 4.5), (4.5, 21.5), (19.5, 21.5), (19.5, 4.5), (16, 4.5),
+             radius=2)
+    pen.line((8.5, 2.5), (15.5, 2.5), (15.5, 6.5), (8.5, 6.5), closed=True, radius=1)
+
+
 def _moon(pen):
     (center, radius) = ((11.5, 12.5), 9)
     (cut, cut_radius) = ((17, 7), 7)
@@ -168,9 +213,11 @@ def _sun(pen):
         pen.line((12 + 7.5 * dx, 12 + 7.5 * dy), (12 + 9.5 * dx, 12 + 9.5 * dy))
 
 
-DRAWINGS = {'new': _new, 'load': _load, 'save': _save, 'save_as': _save_as,
+DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save,
+            'save_as': _save_as,
             'load_weights': _load_weights, 'save_weights': _save_weights, 'run': _run,
-            'record': _record, 'stop': _stop, 'moon': _moon, 'sun': _sun}
+            'record': _record, 'stop': _stop, 'undo': _undo, 'redo': _redo, 'cut': _cut,
+            'copy': _copy, 'paste': _paste, 'moon': _moon, 'sun': _sun}
 
 
 @lru_cache(maxsize=None)
