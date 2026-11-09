@@ -445,48 +445,45 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
     # policy RUN functions
     def _evaluate(record):
-        nonlocal domain_file, inst_file, viz, active_run, trained
+        nonlocal active_run, trained
         if active_run is not None:
             return
-        save_domain()
-        save_instance()
-        if domain_file is not None and inst_file is not None:
-            editors = {'domain': domain_editor, 'instance': inst_editor}
-            for editor in editors.values():
-                editor.clear_error()
-            progress = RunProgress(status_bar)
-            try:
-                build_policy, required_env_args = policy_pane.policy(progress)
-            except Exception as error:
-                _show_error('Policy error', error)
-                return
-            provider = policy_pane.provider
-            active_run = progress
+        editors = {'domain': domain_editor, 'instance': inst_editor}
+        for editor in editors.values():
+            editor.clear_error()
+        progress = RunProgress(status_bar)
+        try:
+            build_policy, required_env_args = policy_pane.policy(progress)
+        except Exception as error:
+            _show_error('Policy error', error)
+            return
+        provider = policy_pane.provider
+        active_run = progress
+        for update in buttons_changed:
+            update()
+        try:
+            message = evaluate_policy(
+                domain_editor.content(), inst_editor.content(), build_policy,
+                required_env_args, viz, record, progress, run_options)
+        finally:
+            active_run = None
+            if progress.policy is not None and provider is not None and \
+                    provider.weight_files is not None:
+                trained = (provider, progress.policy)
             for update in buttons_changed:
                 update()
-            try:
-                message = evaluate_policy(
-                    domain_file, inst_file, build_policy, required_env_args, viz, record,
-                    progress, run_options)
-            finally:
-                active_run = None
-                if progress.policy is not None and provider is not None and \
-                        provider.weight_files is not None:
-                    trained = (provider, progress.policy)
-                for update in buttons_changed:
-                    update()
-            if close_after_run:
-                finish_exit()
-                return
-            if progress.stopped:
-                progress.show_stopped()
-                return
-            if message is not None:
-                location = locate_error(
-                    message, domain_editor.get('1.0', 'end'),
-                    inst_editor.get('1.0', 'end'))
-                if location is not None:
-                    editors[location.source].show_error(location.start, location.end)
+        if close_after_run:
+            finish_exit()
+            return
+        if progress.stopped:
+            progress.show_stopped()
+            return
+        if message is not None:
+            location = locate_error(
+                message, domain_editor.get('1.0', 'end'),
+                inst_editor.get('1.0', 'end'))
+            if location is not None:
+                editors[location.source].show_error(location.start, location.end)
     
     def evaluate():
         _evaluate(None)
@@ -508,10 +505,6 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             return
         if active_run is not None:
             return
-        save_domain()
-        save_instance()
-        if domain_file is None or inst_file is None:
-            return
         for editor in (domain_editor, inst_editor):
             editor.clear_error()
         progress = RunProgress(status_bar)
@@ -527,8 +520,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         stepper = None
         try:
             progress.note('Preparing the environment and the policy...')
-            stepper = Stepper(domain_file, inst_file, build_policy, required_env_args,
-                              viz, run_options, progress)
+            stepper = Stepper(domain_editor.content(), inst_editor.content(), build_policy,
+                              required_env_args, viz, run_options, progress)
         except RunStopped:
             pass
         except Exception as error:

@@ -68,10 +68,15 @@ def _summary(episodes: _Episodes, stats, count: int) -> str:
            f'max {number(stats["max"])})'
 
 
-def make_environment(domain_file, inst_file, required_env_args, viz,
+def make_environment(domain, instance, required_env_args, viz,
                      options: RunOptions, log_path: str, record=None):
-    '''The environment of a run, made with the arguments returned by required_env_args()
-    and the options, and whether it is rendered.'''
+    '''The environment of a run of the RDDL texts, made with the arguments returned by
+    required_env_args() and the options, and whether it is rendered.'''
+    (domain_file, inst_file) = (os.path.join(os.path.dirname(log_path), name)
+                                for name in ('domain.rddl', 'instance.rddl'))
+    for (path, text) in ((domain_file, domain), (inst_file, instance)):
+        with open(path, 'w', encoding='utf-8') as file:
+            file.write(text)
     env_args = dict(required_env_args())
     if options.enforce_constraints:
         env_args['enforce_action_constraints'] = True
@@ -92,9 +97,10 @@ def make_environment(domain_file, inst_file, required_env_args, viz,
     return (env, render)
 
 
-def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz, record,
+def evaluate_policy(domain, instance, build_policy, required_env_args, viz, record,
                     progress: RunProgress, options: RunOptions=RunOptions()):
-    '''Runs the episodes of the policy built by build_policy(env) in an environment made
+    '''Runs the episodes of the policy built by build_policy(env) on the RDDL texts, in
+    an environment made
     with the arguments returned by required_env_args() and the options, showing their
     progress. viz is the visualizer of the domain in rddlrepository, if any.'''
     env = None
@@ -103,7 +109,7 @@ def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz
         try:
             try:
                 progress.note('Preparing the environment and the policy...')
-                (env, render) = make_environment(domain_file, inst_file, required_env_args,
+                (env, render) = make_environment(domain, instance, required_env_args,
                                                  viz, options, log_path, record)
                 policy = progress.policy = build_policy(env)
                 episodes = _Episodes(env, progress, options.episodes)

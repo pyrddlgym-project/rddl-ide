@@ -27,7 +27,7 @@ class Stepper:
     '''The environment and policy of a run, stepped through by step() after restart().
     Raises what pyRDDLGym or the policy raise; close() when done.'''
 
-    def __init__(self, domain_file, inst_file, build_policy, required_env_args, viz,
+    def __init__(self, domain, instance, build_policy, required_env_args, viz,
                  options: RunOptions, progress):
         self.options = options
         self._folder = tempfile.TemporaryDirectory()
@@ -37,7 +37,7 @@ class Stepper:
         self.done = True
         try:
             (self.env, self.render) = make_environment(
-                domain_file, inst_file, required_env_args, viz, options, self._log_path)
+                domain, instance, required_env_args, viz, options, self._log_path)
             self.model = self.env.model
             self.policy = progress.policy = build_policy(self.env)
         except BaseException:
