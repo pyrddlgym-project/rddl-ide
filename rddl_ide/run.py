@@ -7,6 +7,7 @@ from customtkinter import (
 from CTkMenuBar import CTkMenuBar
 
 from rddl_ide.core.appicon import set_icon
+from rddl_ide.core import outline
 from rddl_ide.core.codearea import CodeEditor
 from rddl_ide.core.menubar import assign_menubar_functions
 from rddl_ide.core.paneheader import PaneHeader
@@ -15,16 +16,47 @@ from rddl_ide.core.statusbar import StatusBar
 from rddl_ide.core.titlebar import match_title_bar
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+BREADCRUMB_DELAY = 100
 
 
 class EditorPane(CTkFrame):
-    '''A code editor with a header naming what it is editing.'''
+    '''A code editor with a header naming what it is editing, followed by a breadcrumb.'''
 
     def __init__(self, master, language, caption):
         super().__init__(master, corner_radius=0)
         self.header = PaneHeader(self, caption)
         self.header.pack(side='top', fill='x')
         self.editor = CodeEditor(self, language=language)
+        self._pending = None
+        text = self.editor.text
+        for sequence in ('<KeyRelease>', '<ButtonRelease-1>', '<<Undo>>', '<<Redo>>',
+                         '<<TextReplaced>>'):
+            text.bind(sequence, self._schedule_crumbs, add='+')
+
+    def _schedule_crumbs(self, _=None):
+        '''Updates the breadcrumb once typing or moving pauses, as it reads the text.'''
+        if self._pending is not None:
+            self.after_cancel(self._pending)
+        self._pending = self.after(BREADCRUMB_DELAY, self._update_crumbs)
+
+    def _update_crumbs(self):
+        self._pending = None
+        text = self.editor.text
+        source = text.content()
+        cursor = len(text.get('1.0', 'insert'))
+        self.header.set_crumbs([
+            (crumb.text, lambda offset=crumb.offset: self._go_to(source, offset))
+            for crumb in outline.crumbs(source, cursor)
+        ])
+
+    def _go_to(self, source, offset):
+        text = self.editor.text
+        index = outline.line_column(source, offset)
+        text.mark_set('insert', index)
+        text.tag_remove('sel', '1.0', 'end')
+        text.see(index)
+        text.focus_set()
+        self._schedule_crumbs()
 
     def title(self, text):
         self.header.configure(text=text)
