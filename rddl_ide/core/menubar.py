@@ -2,7 +2,7 @@ import os
 import sys
 import traceback
 from tkinter import messagebox
-from customtkinter import StringVar, CTkEntry
+from customtkinter import StringVar, CTkEntry, ThemeManager
 from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
@@ -476,8 +476,21 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     def toggle_theme():
         set_appearance_mode('light' if get_appearance_mode() == 'Dark' else 'dark')
 
+    word_wrap = False
+
+    def toggle_word_wrap():
+        '''Wraps long lines at the edge of the domain, instance and policy editors, or
+        not; the button stays shaded while they are wrapped.'''
+        nonlocal word_wrap
+        word_wrap = not word_wrap
+        for editor in (domain_editor, inst_editor, policy_editor):
+            editor.configure(wrap='word' if word_wrap else 'none')
+        wrap_button.configure(fg_color=ThemeManager.theme['Palette']['hover']
+                              if word_wrap else 'transparent')
+
     view_menu = menu.add_cascade("View")
     view_menu_drop = MenuBarMenu(view_menu)
+    view_menu_drop.add_option(option='Toggle Word Wrap', command=toggle_word_wrap)
     view_menu_drop.add_option(option='Toggle Light/Dark Theme', command=toggle_theme)
 
     # buttons: on the right of the menu bar and of the header of each pane
@@ -488,9 +501,12 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     for (column, (icon, tooltip, command)) in enumerate(edit_buttons, menu.num + 1):
         IconButton(menu, icon, tooltip, command).grid(
             row=0, column=column, padx=(0, 2 if icon != 'redo' else 10), pady=2)
+    column = menu.num + 1 + len(edit_buttons)
+    wrap_button = IconButton(menu, 'wrap', 'Toggle word wrap', toggle_word_wrap)
+    wrap_button.grid(row=0, column=column, padx=(8, 2), pady=2)
     theme_button = IconButton(
         menu, 'moon', 'Toggle light/dark theme', toggle_theme, dark_name='sun')
-    theme_button.grid(row=0, column=menu.num + 1 + len(edit_buttons), padx=(8, 6), pady=2)
+    theme_button.grid(row=0, column=column + 1, padx=(0, 6), pady=2)
 
     for (header, noun, commands) in (
             (domain_pane.header, 'domain',

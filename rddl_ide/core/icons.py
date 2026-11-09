@@ -193,6 +193,13 @@ def _paste(pen):
     pen.line((8.5, 2.5), (15.5, 2.5), (15.5, 6.5), (8.5, 6.5), closed=True, radius=1)
 
 
+def _wrap(pen):
+    pen.line((3.5, 5.5), (20.5, 5.5))
+    pen.line((3.5, 12), (17, 12), (20.5, 12), (20.5, 18.5), (13, 18.5), radius=3.25)
+    pen.line((15.5, 16), (13, 18.5), (15.5, 21))
+    pen.line((3.5, 18.5), (8.5, 18.5))
+
+
 def _moon(pen):
     (center, radius) = ((11.5, 12.5), 9)
     (cut, cut_radius) = ((17, 7), 7)
@@ -217,7 +224,7 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'save_as': _save_as,
             'load_weights': _load_weights, 'save_weights': _save_weights, 'run': _run,
             'record': _record, 'stop': _stop, 'undo': _undo, 'redo': _redo, 'cut': _cut,
-            'copy': _copy, 'paste': _paste, 'moon': _moon, 'sun': _sun}
+            'copy': _copy, 'paste': _paste, 'wrap': _wrap, 'moon': _moon, 'sun': _sun}
 
 
 @lru_cache(maxsize=None)
