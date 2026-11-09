@@ -9,7 +9,6 @@ from rddl_ide.core.settings.introspect import concrete_subclasses, signature_fie
 from rddl_ide.core.settings.model import Field, FormState, Section
 from rddl_ide.core.settings.provider import Provider, assign, read_config, write_config
 
-# arguments the IDE supplies from the environment, by name
 SUPPLIED_BY_ENV = {
     'env': lambda env: env,
     'action_space': lambda env: env.action_space,
@@ -37,7 +36,8 @@ class BuiltinAgentProvider(Provider):
         return self._sections
 
     def to_config(self, state: FormState) -> str:
-        values = {'agent': self.section('agent').option(state), **self.changed(state, 'agent')}
+        values = {'agent': self.section('agent').option(state), 
+                  **self.changed(state, 'agent')}
         return write_config(self.kind, [('Agent', values)])
 
     def from_config(self, text: str) -> FormState:

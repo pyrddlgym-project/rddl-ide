@@ -31,9 +31,7 @@ WEIGHT_FILES = [('JaxPlan weights', '*.pickle *.pkl'), ('All files', '*.*')]
 # settings of the planner shown in sections of their own
 PLANNER_CHOICES = {'auxiliary'}
 
-# arguments that the config loader resolves from a name to an optax optimizer; the
-# settings of an optimizer_kwargs[_suffix] table are those of optimizer[_suffix] if the
-# class has it and it is set, else of optimizer
+# arguments that the config loader resolves from a name to an optax optimizer
 OPTIMIZER_ARGS = ('optimizer', 'optimizer_sigma')
 OPTIMIZER_KWARGS = 'optimizer_kwargs'
 
@@ -107,14 +105,15 @@ class JaxPlanProvider(Provider):
         self.title = 'JaxPlan (online)' if online else 'JaxPlan (offline)'
         self.controller = controller.JaxOnlineController if online \
             else controller.JaxOfflineController
-        self.weight_files = None if online else WEIGHT_FILES  # online replans each step
+        self.weight_files = None if online else WEIGHT_FILES
         self.planners = concrete_subclasses(planner, planner.JaxPlanner)
         self.plans = concrete_subclasses(plan, plan.JaxPlan)
         self.compilers = {name: obj for (name, obj) in vars(logic).items()
                           if isinstance(obj, type) and obj.__module__ == logic.__name__
                           and issubclass(obj, logic.JaxRDDLCompilerWithGrad)
                           and 'Compiler' in name}
-        self.base_planner_args = set(inspect.signature(planner.JaxPlanner.__init__).parameters)
+        self.base_planner_args = set(
+            inspect.signature(planner.JaxPlanner.__init__).parameters)
         self._sections = self._make_sections()
 
     # ===========================================================================
@@ -141,9 +140,6 @@ class JaxPlanProvider(Provider):
     def _auxiliary_fields(self, option: str) -> List[Field]:
         if option not in self.planners:
             return []
-
-        # an auxiliary planner ignores the arguments it shares with the planner it runs
-        # alongside, so only the arguments its class adds are settings
         return fields_with_traced_kwargs(
             self.planners[option], TRACE_MODULES,
             NOT_CONFIGURABLE_PLANNER | self.base_planner_args)
@@ -154,9 +150,11 @@ class JaxPlanProvider(Provider):
 
     @functools.lru_cache(maxsize=None)
     def _optimize_fields(self) -> List[Field]:
-        fields = signature_fields(planner.JaxPlanner.optimize_generator, NOT_CONFIGURABLE_OPTIMIZE)
+        fields = signature_fields(
+            planner.JaxPlanner.optimize_generator, NOT_CONFIGURABLE_OPTIMIZE)
         names = {field.name for field in fields}
-        fields += [field for field in signature_fields(self.controller, NOT_CONFIGURABLE_OPTIMIZE)
+        fields += [field for field in signature_fields(
+                        self.controller, NOT_CONFIGURABLE_OPTIMIZE)
                    if field.name not in names]
         return fields
 
@@ -201,7 +199,8 @@ class JaxPlanProvider(Provider):
 
     def initial_state(self) -> FormState:
         name = 'default_replan.cfg' if self.online else 'default_slp.cfg'
-        path = os.path.join(os.path.dirname(pyRDDLGym_jax.__file__), 'examples', 'configs', name)
+        path = os.path.join(
+            os.path.dirname(pyRDDLGym_jax.__file__), 'examples', 'configs', name)
         if os.path.isfile(path):
             with open(path) as file:
                 return self.from_config(file.read())
@@ -210,7 +209,8 @@ class JaxPlanProvider(Provider):
     def to_config(self, state: FormState) -> str:
         compiler, planners, auxiliary, plans = (
             self.section(name) for name in ('compiler', 'planner', 'auxiliary', 'plan'))
-        compiler_values = {'method': compiler.option(state), **self.changed(state, 'compiler')}
+        compiler_values = {'method': compiler.option(state), 
+                           **self.changed(state, 'compiler')}
 
         planner_values = {'planner': planners.option(state), 'method': plans.option(state)}
         plan_kwargs = self.changed(state, 'plan')
@@ -243,7 +243,8 @@ class JaxPlanProvider(Provider):
                 option = values_of.pop(key)
                 option = 'None' if option is None else str(option)
                 self.section(section_id).choose(state, option)
-        def pop_dict(key):  # a value that is not a dict stays with the planner settings
+
+        def pop_dict(key):
             value = planner_values.get(key)
             if value is None or isinstance(value, dict):
                 planner_values.pop(key, None)
@@ -277,8 +278,7 @@ class JaxPlanProvider(Provider):
 
 
     def save_weights(self, policy, path: str) -> None:
-        '''Writes the file JaxOfflineController(save_path=path) writes after training,
-        which its params setting loads.'''
+        '''Writes the file JaxOfflineController(save_path=path) writes after training.'''
         contents = {'params': policy.params, 'hyperparams': policy.eval_hyperparams}
         with open(path, 'wb') as file:
             pickle.dump(contents, file)
@@ -289,12 +289,10 @@ class JaxPlanProvider(Provider):
 
 
 def _report_training(jax_planner, progress, caption: str) -> None:
-    '''Reports every iteration of the planner's training to progress: optimize(), which
-    the controllers call, runs optimize_generator(), which yields the metrics.'''
+    '''Reports every iteration of the planner's training to progress.'''
     generate = jax_planner.optimize_generator
 
     def describe(callback) -> str:
-        # the returns of the policies optimized in parallel: shows the best on test
         test = np.ravel(callback['test_return'])
         index = int(np.argmax(test))
         train = np.ravel(callback['train_return'])[index]
@@ -307,5 +305,4 @@ def _report_training(jax_planner, progress, caption: str) -> None:
         for callback in generate(*args, **kwargs):
             progress.training(lambda: describe(callback))
             yield callback
-
     jax_planner.optimize_generator = optimize_generator

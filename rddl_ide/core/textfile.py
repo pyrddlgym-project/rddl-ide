@@ -11,8 +11,8 @@ NEWLINE_NAMES = {'\r\n': 'CRLF', '\n': 'LF', '\r': 'CR'}
 class FileFormat(NamedTuple):
     '''The encoding (a Python codec name) and line ending of a text file.'''
     encoding: str = 'utf-8'
-    newline: str = os.linesep  # of a new file
-
+    newline: str = os.linesep
+    
     def describe(self) -> Tuple[str, str]:
         '''The names of the encoding and line ending, as shown in the status bar.'''
         if self.encoding == 'utf-8-sig':
@@ -24,8 +24,7 @@ class FileFormat(NamedTuple):
 
 def read(path: str) -> Tuple[str, FileFormat]:
     '''The text of a file, with its line endings as \\n, and the file's format. The file
-    is decoded as UTF-8, else in the system's encoding, else as Latin-1 (which decodes
-    any bytes).'''
+    is decoded as UTF-8, else in the system's encoding, else as Latin-1.'''
     with open(path, 'rb') as file:
         data = file.read()
     if data.startswith(codecs.BOM_UTF8):
@@ -44,9 +43,7 @@ def read(path: str) -> Tuple[str, FileFormat]:
 
 
 def write(path: str, text: str, file_format: FileFormat) -> FileFormat:
-    '''Writes the text (with \\n line endings) in the format, and returns the format
-    written: UTF-8 with the same line endings, if the text has characters the file's
-    encoding cannot represent.'''
+    '''Writes the text in the format, and returns the format written.'''
     text = text.replace('\n', file_format.newline)
     try:
         data = text.encode(file_format.encoding)

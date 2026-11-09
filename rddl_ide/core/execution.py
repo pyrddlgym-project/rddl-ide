@@ -34,16 +34,13 @@ class _Episode:
             self.discount *= env.discount
             progress.step(self.steps, env.horizon, reward, self.total)
             return result
-
         env.step = step
 
 
 def evaluate_policy(domain_file, inst_file, build_policy, required_env_args, viz, record,
                     progress: RunProgress):
     '''Runs one episode of the policy built by build_policy(env) in an environment made
-    with the arguments returned by required_env_args(), showing its progress; shows an
-    error in a dialog and returns its message (with the terminal formatting that marks
-    the line of a syntax error), if any.'''
+    with the arguments returned by required_env_args(), showing its progress.'''
     env = None
     try:
         try:
@@ -79,5 +76,5 @@ def _close(env) -> None:
     if env is not None:
         try:
             env.close()
-        except Exception:  # the run's own error, if any, is the one to report
+        except Exception:
             pass

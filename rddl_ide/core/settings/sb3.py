@@ -1,6 +1,5 @@
 '''Stable-Baselines3 (through pyRDDLGym-rl) as a settings form, read from the installed
-packages. The algorithms are those pyRDDLGym-rl finds in stable-baselines3 and
-sb3-contrib.'''
+packages. The algorithms are pyRDDLGym-rl finds in stable-baselines3 and sb3-contrib.'''
 import functools
 from typing import Any, Dict, List
 
@@ -39,7 +38,8 @@ class StableBaselinesProvider(Provider):
                 StableBaselinesTrainer, NOT_CONFIGURABLE_TRAINER)),
             Section('train', '[Train]', fields=lambda option, state: signature_fields(
                 StableBaselinesTrainer.train, NOT_CONFIGURABLE_TRAIN)),
-            Section('environment', '[Environment]', fields=lambda option, state: signature_fields(
+            Section('environment', '[Environment]', 
+                    fields=lambda option, state: signature_fields(
                 SimplifiedActionRDDLEnv, NOT_CONFIGURABLE_ENV)),
         ]
 
@@ -66,11 +66,13 @@ class StableBaselinesProvider(Provider):
             self.section('algorithm').choose(state, str(algorithm.pop('method')).lower())
         assign(state, self.section('algorithm'), algorithm)
         for section_id in ('trainer', 'train', 'environment'):
-            assign(state, self.section(section_id), values.get(SECTION_NAMES[section_id], {}))
+            assign(
+                state, self.section(section_id), values.get(SECTION_NAMES[section_id], {}))
         return state
 
     def env_args(self, state: FormState) -> Dict[str, Any]:
-        return {'base_class': SimplifiedActionRDDLEnv, **self.changed(state, 'environment')}
+        return {'base_class': SimplifiedActionRDDLEnv, 
+                **self.changed(state, 'environment')}
 
     def build_policy(self, env, state: FormState, progress=None):
         trainer = StableBaselinesTrainer(
@@ -89,7 +91,7 @@ class _ReportTraining(BaseCallback):
         self.progress = progress
 
     def _on_training_start(self) -> None:
-        self._start = self.model.num_timesteps  # of earlier training sessions
+        self._start = self.model.num_timesteps
         self._total = self.locals['total_timesteps'] - self._start
 
     def _on_step(self) -> bool:

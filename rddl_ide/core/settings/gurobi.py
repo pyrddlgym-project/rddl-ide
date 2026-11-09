@@ -17,8 +17,7 @@ NOT_CONFIGURABLE_COMPILER = {'rddl', 'plan', 'logger', 'model_params'}
 
 @functools.lru_cache(maxsize=None)
 def solver_parameters() -> List[Field]:
-    '''Every Gurobi parameter with its default, read from an environment that is never
-    started, so that no license is needed.'''
+    '''Every Gurobi parameter with its default.'''
     env = gurobipy.Env(empty=True)
     names = sorted(name for name in dir(gurobipy.GRB.Param) if not name.startswith('_'))
     fields = []
@@ -60,7 +59,8 @@ class GurobiProvider(Provider):
         return self._sections
 
     def initial_state(self) -> FormState:
-        path = os.path.join(os.path.dirname(pyRDDLGym_gurobi.__file__), 'examples', 'default.cfg')
+        path = os.path.join(
+            os.path.dirname(pyRDDLGym_gurobi.__file__), 'examples', 'default.cfg')
         if os.path.isfile(path):
             with open(path) as file:
                 return self.from_config(file.read())
@@ -72,8 +72,8 @@ class GurobiProvider(Provider):
         if method_kwargs:
             optimizer['method_kwargs'] = method_kwargs
         optimizer.update(self.changed(state, 'optimizer'))
-        return write_config(self.kind, [('Gurobi', self.changed(state, 'gurobi')),
-                                        ('Optimizer', optimizer)])
+        return write_config(self.kind, [
+            ('Gurobi', self.changed(state, 'gurobi')), ('Optimizer', optimizer)])
 
     def from_config(self, text: str) -> FormState:
         values = read_config(text)

@@ -1,25 +1,14 @@
-'''Finds the part of the domain or instance source that a pyRDDLGym error points to.
-
-A syntax error shows the line at fault among the lines around it. Its line number is
-not used: it counts lines of the text the parser read, which is the domain and the
-instance after preprocessing (comments and blank lines removed, macros expanded, ...),
-not lines of the editors. Instead the shown lines are matched to the sources' lines,
-so a line that occurs several times (e.g. '};') is found by its neighbours.
-
-A compiler error quotes the decompiled expression at fault and the definition it is in
-(e.g. a CPF), so the expression is searched for in that definition, ignoring
-differences in whitespace.'''
+'''Finds the part of the domain or instance source that a pyRDDLGym error points to.'''
 import re
 from difflib import SequenceMatcher
 from typing import List, NamedTuple, Optional, Tuple
 
 _ANSI_CODE = re.compile(r'\033\[[0-9;]*m')
 _SYNTAX_LINE = re.compile(r'\033\[4m(.*?)\033\[(?:24|0)m')
-_SYNTAX_MARK = ' >> '  # how the message marks the line at fault among the lines shown
+_SYNTAX_MARK = ' >> '
 _ROOT = 'Please check expression for '
 _COMMENT = re.compile(r'//[^\n]*')
 
-# below this similarity a fuzzy match is more likely misleading than helpful
 MIN_SIMILARITY = 0.6
 
 # blocks whose statements compiler errors number, e.g. 'Precondition 2'
@@ -80,11 +69,11 @@ def _shown_lines(message: str, at_fault: str) -> Tuple[List[str], int]:
             position = len(shown)
             shown.append(line[len(_SYNTAX_MARK):].strip())
         elif line.startswith(' ' * len(_SYNTAX_MARK)):
-            if line.strip():  # like the sources' blank lines, which the parser skips
+            if line.strip():
                 shown.append(line.strip())
-        elif position is not None:  # the end of the lines shown
+        elif position is not None:
             break
-        else:  # a line before the ones shown
+        else: 
             shown = []
     if position is None or shown[position] != at_fault.strip():
         return [at_fault.strip()], 0
@@ -92,13 +81,11 @@ def _shown_lines(message: str, at_fault: str) -> Tuple[List[str], int]:
 
 
 def _locate_line(shown: List[str], at_fault: int, sources) -> Optional[Location]:
-    '''Finds the source line at fault: of the lines that read like it, the one whose
-    neighbours read most like the lines shown around it (the first one on a tie). The
-    parser reads the sources' lines without comments and blank lines.'''
-    lines = []  # (source name, source text, start, end, content) of each line read
+    '''Finds the source line at fault.'''
+    lines = []
     for (name, text) in sources:
         offset = 0
-        for line in text.split('\n'):  # Tk, like the parser, only breaks lines at \n
+        for line in text.split('\n'):
             content = _blank_comments(line).strip()
             if content:
                 start = offset + len(line) - len(line.lstrip())
@@ -106,7 +93,7 @@ def _locate_line(shown: List[str], at_fault: int, sources) -> Optional[Location]
                 lines.append((name, text, start, end, content))
             offset += len(line) + 1
 
-    def agreement(k):  # how many shown lines the lines around line k read like
+    def agreement(k):
         return sum(1 for (j, wanted) in enumerate(shown)
                    if 0 <= k - at_fault + j < len(lines)
                    and lines[k - at_fault + j][4] == wanted)
@@ -129,7 +116,7 @@ def _statement_end(text: str, start: int) -> int:
         if text[i] in '([{':
             depth += 1
         elif text[i] in ')]}':
-            if depth == 0:  # the block ended without a ;
+            if depth == 0:
                 return i
             depth -= 1
         elif text[i] == ';' and depth == 0:
@@ -138,8 +125,7 @@ def _statement_end(text: str, start: int) -> int:
 
 
 def _scope(text: str, root: Optional[str]) -> Optional[Tuple[int, int]]:
-    '''Returns the span of the definition an error names, e.g. 'CPF <burning'>',
-    'reward' or 'Precondition 2', in text whose comments are blanked.'''
+    '''Returns the span of the definition an error names.'''
     if root is None:
         return None
     match = re.fullmatch(r'(?:policy )?CPF <?(.+?)>?', root)
@@ -147,7 +133,8 @@ def _scope(text: str, root: Optional[str]) -> Optional[Tuple[int, int]]:
         name = 'reward' if match is None else match.group(1)
         head = re.compile(r'[;{]\s*(' + re.escape(name) + r')\s*(?:\([^)]*\))?\s*=(?!=)')
         found = head.search(text)
-        return None if found is None else (found.start(1), _statement_end(text, found.start(1)))
+        return None if found is None else (
+            found.start(1), _statement_end(text, found.start(1)))
     match = re.fullmatch(r'(\w+) (\d+)', root)
     if match is None or match.group(1) not in _NUMBERED_BLOCKS:
         return None
@@ -165,9 +152,7 @@ def _scope(text: str, root: Optional[str]) -> Optional[Tuple[int, int]]:
 
 
 def _closest(text: str, span: Tuple[int, int], query: str) -> Optional[Tuple[float, int, int]]:
-    '''Finds the part of text[span] most similar to query, ignoring whitespace (the
-    decompiler formats expressions differently from the source). Returns the similarity
-    and the offsets of that part.'''
+    '''Finds the part of text[span] most similar to query, ignoring whitespace.'''
     keep = [i for i in range(*span) if not text[i].isspace()]
     corpus = ''.join(text[i] for i in keep)
     query = ''.join(query.split())
@@ -180,7 +165,6 @@ def _closest(text: str, span: Tuple[int, int], query: str) -> Optional[Tuple[flo
     # coarse scan of windows of the query's length, then refine both ends
     matcher = SequenceMatcher(None, autojunk=False)
     matcher.set_seq2(query)
-
     def similarity(window):
         (a, b) = window
         matcher.set_seq1(corpus[a:b])
@@ -207,7 +191,7 @@ def _locate_expression(expression: str, root: Optional[str], sources) -> Optiona
         blanked = _blank_comments(text)
         span = _scope(blanked, root)
         found = _closest(blanked, span or (0, len(blanked)), expression)
-        if span is not None:  # the definition is in this source: look nowhere else
+        if span is not None:
             results = []
         if found is not None:
             results.append((found[0], name, text, found[1], found[2]))

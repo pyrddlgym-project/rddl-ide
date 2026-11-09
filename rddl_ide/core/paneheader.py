@@ -3,12 +3,11 @@ from customtkinter import CTkFont, CTkFrame, CTkLabel, ThemeManager
 
 from rddl_ide.core.icons import IconButton
 
-GROUP_GAP = 10  # between groups of buttons
+GROUP_GAP = 10
 
 
 class PaneHeader(CTkFrame):
-    '''A caption on the frame color with a hairline below it, and icon buttons on the
-    right.'''
+    '''A caption on the frame color with a hairline below it, icon buttons on the right.'''
 
     def __init__(self, master, text):
         palette = ThemeManager.theme['Palette']

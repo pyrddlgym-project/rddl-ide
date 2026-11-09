@@ -23,9 +23,11 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     # load template RDDL
     abs_path = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(abs_path, 'prefab', 'domain.rddl'), encoding='utf-8') as dom_txt:
+    with open(os.path.join(
+            abs_path, 'prefab', 'domain.rddl'), encoding='utf-8') as dom_txt:
         DOMAIN_TEMPLATE = dom_txt.read()
-    with open(os.path.join(abs_path, 'prefab', 'instance.rddl'), encoding='utf-8') as inst_txt:
+    with open(os.path.join(
+            abs_path, 'prefab', 'instance.rddl'), encoding='utf-8') as inst_txt:
         INSTANCE_TEMPLATE = inst_txt.read()
     
     # FILE functions
@@ -48,16 +50,16 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         
     def open_domain():
         nonlocal domain_file, viz    
-        domain_file = fd.askopenfilename(defaultextension='.rddl',
-                                         filetypes=[('RDDL File', '*.rddl*')])
+        domain_file = fd.askopenfilename(
+            defaultextension='.rddl', filetypes=[('RDDL File', '*.rddl*')])
         viz = None
         if domain_file == '': domain_file = None            
         _pane_from_file(domain_pane, domain_editor, 'Domain', domain_file)
     
     def open_instance():
         nonlocal inst_file        
-        inst_file = fd.askopenfilename(defaultextension='.rddl',
-                                       filetypes=[('RDDL File', '*.rddl*')])
+        inst_file = fd.askopenfilename(
+            defaultextension='.rddl', filetypes=[('RDDL File', '*.rddl*')])
         if inst_file == '': inst_file = None            
         _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)
     
@@ -127,26 +129,26 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     
     def _pane_to_file(window, editor, caption, file_path):
         if file_path is not None: 
-            editor.file_format = textfile.write(file_path, editor.content(),
-                                                editor.file_format)
+            editor.file_format = textfile.write(
+                file_path, editor.content(), editor.file_format)
             status_bar.update_position()
             window.title(f'{caption}: {os.path.basename(file_path)}')
     
     def save_domain():
         nonlocal domain_file        
         if domain_file is None:
-            domain_file = fd.asksaveasfilename(initialfile='domain.rddl',
-                                               defaultextension='.rddl',
-                                               filetypes=[('RDDL File', '*.rddl*')])
+            domain_file = fd.asksaveasfilename(
+                initialfile='domain.rddl', defaultextension='.rddl',
+                filetypes=[('RDDL File', '*.rddl*')])
             if domain_file == '': domain_file = None 
         _pane_to_file(domain_pane, domain_editor, 'Domain', domain_file)
         
     def save_instance():
         nonlocal inst_file        
         if inst_file is None:
-            inst_file = fd.asksaveasfilename(initialfile='instance.rddl',
-                                             defaultextension='.rddl',
-                                             filetypes=[('RDDL File', '*.rddl*')])
+            inst_file = fd.asksaveasfilename(
+                initialfile='instance.rddl', defaultextension='.rddl',
+                filetypes=[('RDDL File', '*.rddl*')])
             if inst_file == '': inst_file = None 
         _pane_to_file(inst_pane, inst_editor, 'Instance', inst_file)
     
@@ -160,13 +162,13 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         inst_file = None
         save_instance()
         
-    active_run = None  # the progress of a run going on, during which events are handled
+    active_run = None
     close_after_run = False
 
     def exit_application():
         nonlocal close_after_run
         if active_run is not None:
-            close_after_run = True  # the window is closed once the run has unwound
+            close_after_run = True
             active_run.stop()
         else:
             root.destroy()
@@ -175,8 +177,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         if active_run is not None:
             active_run.stop()
 
-    buttons_changed = []  # called when the buttons enabled may have changed
-
+    buttons_changed = []
+    
     root.protocol('WM_DELETE_WINDOW', exit_application)
     
     def register_domain():
@@ -186,7 +188,6 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
         def close_me():
             dialog.destroy()
-
 
         def save_domain():
             from rddlrepository.core.manager import RDDLRepoManager
@@ -240,19 +241,20 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     # EDIT functions act on whichever editor last had the keyboard focus
     last_focused = [domain_editor]
     for editor in (domain_editor, inst_editor, policy_editor):
-        editor.bind('<FocusIn>', lambda _, e=editor: last_focused.__setitem__(0, e), add='+')
+        editor.bind(
+            '<FocusIn>', lambda _, e=editor: last_focused.__setitem__(0, e), add='+')
         status_bar.track(editor)
-    policy_pane.changed.append(status_bar.update_position)  # e.g. the code was hidden
-
+    policy_pane.changed.append(status_bar.update_position)
+    
     def _edit_event(event):
         editor = last_focused[0]
         editor.focus_set()
-        editor._textbox.event_generate(event)  # CTkTextbox does not forward events
-
+        editor._textbox.event_generate(event)
+        
     def undo_text():
         _edit_event('<<Undo>>')
-        last_focused[0].apply()  # typing highlights on key release, a menu click does not
-
+        last_focused[0].apply()
+        
     def redo_text():
         _edit_event('<<Redo>>')
         last_focused[0].apply()
@@ -284,8 +286,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
 
     def save_policy_as():
         extension = policy_pane.default_extension()
-        policy_file = fd.asksaveasfilename(initialfile='policy' + extension,
-                                           defaultextension=extension, filetypes=POLICY_FILES)
+        policy_file = fd.asksaveasfilename(
+            initialfile='policy' + extension,
+            defaultextension=extension, filetypes=POLICY_FILES)
         if policy_file:
             try:
                 policy_pane.save(policy_file)
@@ -295,18 +298,19 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     policy_pane.show_form('builtin')
 
     # trained WEIGHTS, of the baselines that have them, e.g. JaxPlan (offline)
-    trained = None  # (provider, policy) of the last run that trained weights
-
+    trained = None
+    
     def load_weights():
         provider = policy_pane.provider
         if provider is None or provider.weight_files is None:
-            messagebox.showinfo('Load Weights', 'The selected policy has no weights to '
-                                                'load. JaxPlan (offline) has.')
+            messagebox.showinfo(
+                'Load Weights', 'The selected policy has no weights to '
+                                'load. JaxPlan (offline) has.')
             return
         path = fd.askopenfilename(filetypes=provider.weight_files)
         if path:
             provider.load_weights(policy_pane.state, path)
-            policy_pane.body.render()  # shows the setting it changed
+            policy_pane.body.render()
             status_bar.show(f'Loaded {os.path.basename(path)}: the next run uses these '
                             f'weights instead of training')
 
@@ -316,8 +320,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                                 'evaluate a JaxPlan (offline) policy first.')
             return
         (provider, policy) = trained
-        path = fd.asksaveasfilename(initialfile='weights.pickle', defaultextension='.pickle',
-                                    filetypes=provider.weight_files)
+        path = fd.asksaveasfilename(
+            initialfile='weights.pickle', defaultextension='.pickle',
+            filetypes=provider.weight_files)
         if path:
             try:
                 provider.save_weights(policy, path)
@@ -342,13 +347,14 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             except Exception as error:
                 _show_error('Policy error', error)
                 return
-            provider = policy_pane.provider  # the form can change during the run
+            provider = policy_pane.provider
             active_run = progress
             for update in buttons_changed:
                 update()
             try:
-                message = evaluate_policy(domain_file, inst_file, build_policy,
-                                          required_env_args, viz, record, progress)
+                message = evaluate_policy(
+                    domain_file, inst_file, build_policy, required_env_args, viz, record, 
+                    progress)
             finally:
                 active_run = None
                 if progress.policy is not None and provider is not None and \
@@ -363,8 +369,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                 progress.show_stopped()
                 return
             if message is not None:
-                location = locate_error(message, domain_editor.get('1.0', 'end'),
-                                        inst_editor.get('1.0', 'end'))
+                location = locate_error(
+                    message, domain_editor.get('1.0', 'end'),
+                    inst_editor.get('1.0', 'end'))
                 if location is not None:
                     editors[location.source].show_error(location.start, location.end)
     
@@ -381,13 +388,16 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     domain_menu_file_drop = MenuBarMenu(domain_menu_file)
     domain_menu_file_drop.add_option(option='New Domain', command=create_domain)
     domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(option='Load Domain from rddlrepository...', command=open_from_dialog)
-    domain_menu_file_drop.add_option(option='Load Domain from File...', command=open_domain)
+    domain_menu_file_drop.add_option(
+        option='Load Domain from rddlrepository...', command=open_from_dialog)
+    domain_menu_file_drop.add_option(
+        option='Load Domain from File...', command=open_domain)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(option='Save Domain', command=save_domain)
     domain_menu_file_drop.add_option(option='Save Domain As...', command=save_domain_as)
     domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option(option='Register Domain in rddlrepository...', command=register_domain)
+    domain_menu_file_drop.add_option(
+        option='Register Domain in rddlrepository...', command=register_domain)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(option='Exit', command=exit_application)
     
@@ -396,12 +406,14 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     inst_menu_file_drop = MenuBarMenu(inst_menu_file)
     inst_menu_file_drop.add_option(option='New Instance', command=create_instance)
     inst_menu_file_drop.add_separator()
-    inst_menu_file_drop.add_option(option='Load Instance from File...', command=open_instance)
+    inst_menu_file_drop.add_option(
+        option='Load Instance from File...', command=open_instance)
     inst_menu_file_drop.add_separator()
     inst_menu_file_drop.add_option(option='Save Instance', command=save_instance)
     inst_menu_file_drop.add_option(option='Save Instance As...', command=save_instance_as)
     inst_menu_file_drop.add_separator()
-    inst_menu_file_drop.add_option(option='Register Instance in rddlrepository...', command=register_instance)
+    inst_menu_file_drop.add_option(
+        option='Register Instance in rddlrepository...', command=register_instance)
     
     # edit menu, for the editor that last had the focus
     edit_menu = menu.add_cascade("Edit")
@@ -416,7 +428,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     # agent menu: the policy file, the built-in baselines, and running the policy
     agent_menu = menu.add_cascade("Agent")
     agent_menu_drop = MenuBarMenu(agent_menu)
-    agent_menu_drop.add_option(option='Load Policy from File...', command=load_policy_from_file)
+    agent_menu_drop.add_option(
+        option='Load Policy from File...', command=load_policy_from_file)
     agent_menu_drop.add_option(option='Save Policy As...', command=save_policy_as)
     agent_menu_drop.add_option(option='Load Weights...', command=load_weights)
     agent_menu_drop.add_option(option='Save Trained Weights...', command=save_weights)
@@ -438,9 +451,9 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     view_menu_drop.add_option(option='Toggle Light/Dark Theme', command=toggle_theme)
 
     # buttons: on the right of the menu bar and of the header of each pane
-    menu.grid_columnconfigure(menu.num, weight=1)  # pushes the next column to the right
-    theme_button = IconButton(menu, 'moon', 'Toggle light/dark theme', toggle_theme,
-                              dark_name='sun')
+    menu.grid_columnconfigure(menu.num, weight=1)
+    theme_button = IconButton(
+        menu, 'moon', 'Toggle light/dark theme', toggle_theme, dark_name='sun')
     theme_button.grid(row=0, column=menu.num + 1, padx=(0, 6), pady=2)
 
     for (header, noun, commands) in (
@@ -463,8 +476,10 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     save_weights_button = policy_header.add_button(
         'save_weights', 'Save trained weights', save_weights)
     policy_header.add_gap()
-    run_buttons = [policy_header.add_button('run', 'Evaluate', evaluate),
-                   policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)]
+    run_buttons = [
+        policy_header.add_button('run', 'Evaluate', evaluate),
+        policy_header.add_button('record', 'Record', record, colors=RECORD_COLOR)
+    ]
     stop_button = policy_header.add_button('stop', 'Stop', stop_run)
 
     def update_buttons():

@@ -1,5 +1,4 @@
-'''Reads settings from the installed packages: constructor and function signatures,
-the classes a module offers, and where a **kwargs dictionary is passed to.'''
+'''Reads settings from the installed packages.'''
 import ast
 import functools
 import inspect
@@ -13,8 +12,7 @@ __all__ = ['MISSING', 'signature_fields', 'concrete_subclasses', 'trace_kwargs_t
 
 def signature_fields(obj, exclude: Iterable[str]=frozenset()) -> List[Field]:
     '''Returns the keyword arguments of a function, or of a class constructor including
-    those it forwards to its parent classes through **kwargs (the first default found
-    along the MRO wins).'''
+    those it forwards to its parent classes through **kwargs.'''
     exclude = set(exclude) | {'self'}
     if isinstance(obj, type):
         functions = [vars(cls)['__init__'] for cls in obj.__mro__
@@ -36,8 +34,6 @@ def signature_fields(obj, exclude: Iterable[str]=frozenset()) -> List[Field]:
                 continue
             default = MISSING if param.default is param.empty else param.default
             fields[param.name] = Field(param.name, default)
-
-        # parent arguments can only be set by keyword if this class forwards **kwargs
         if not forwards:
             break
     return list(fields.values())
@@ -73,9 +69,7 @@ def _resolve(expr: ast.AST, module: ModuleType) -> Optional[Callable]:
 
 def trace_kwargs_target(modules: Iterable[ModuleType], kwargs_name: str) -> Optional[Callable]:
     '''Finds the function that a **kwargs dictionary setting is unpacked into, by reading
-    the source for calls f(**name), f(**self.name) or f(**self._name) where f is a fixed
-    (dotted) name. Returns None when there is no such call, the callee is chosen at run
-    time, or different calls disagree.'''
+    the source for calls f(**name), f(**self.name) or f(**self._name).'''
     wanted = kwargs_name.lstrip('_')
     targets = set()
     for module in modules:
@@ -89,7 +83,8 @@ def trace_kwargs_target(modules: Iterable[ModuleType], kwargs_name: str) -> Opti
                 if keyword.arg is not None:
                     continue
                 value = keyword.value
-                name = value.attr if isinstance(value, ast.Attribute) else getattr(value, 'id', '')
+                name = value.attr if isinstance(value, ast.Attribute) \
+                    else getattr(value, 'id', '')
                 if name.lstrip('_') != wanted:
                     continue
                 target = _resolve(node.func, module)

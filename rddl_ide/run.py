@@ -43,7 +43,7 @@ def create_window():
     window = CTk()
     window.title('RDDL IDE')
     set_icon(window)
-    match_title_bar(window)  # one strip with the menu bar, on Windows 11
+    match_title_bar(window)
     screen_w, screen_h = window.winfo_screenwidth(), window.winfo_screenheight()
     window.geometry(f'{int(screen_w * 0.8)}x{int(screen_h * 0.8)}')
     window.after(0, lambda: _maximize(window))
@@ -51,7 +51,7 @@ def create_window():
     menu = CTkMenuBar(window, bg_color=palette['chrome'], padx=2, pady=3)
 
     # domain on the left, instance above policy on the right, with draggable dividers
-    status_bar = StatusBar(window)  # packed first, so that the panes cannot squeeze it
+    status_bar = StatusBar(window)
     status_bar.pack(side='bottom', fill='x')
     divider = window._apply_appearance_mode(ThemeManager.theme['CTk']['fg_color'])
     panes = PanedWindow(window, orient='horizontal', sashwidth=6, bd=0, bg=divider)
@@ -72,8 +72,9 @@ def create_window():
     def recolor(_):
         window.after_idle(color_dividers)
     AppearanceModeTracker.add(recolor, window)
-    window.bind('<Destroy>', lambda event: event.widget is window and
-                AppearanceModeTracker.remove(recolor), add='+')
+    window.bind('<Destroy>', 
+                lambda event: event.widget is window and
+                    AppearanceModeTracker.remove(recolor), add='+')
 
     # size the panes once the window has been maximized
     def place_dividers():

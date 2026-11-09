@@ -40,24 +40,19 @@ def write_config(kind: str, sections: Sequence[Tuple[str, Dict[str, Any]]]) -> s
 
 def fields_with_traced_kwargs(obj, modules, exclude=frozenset()) -> List[Field]:
     '''The settings of a class or function, where each **kwargs dictionary setting whose
-    target can be traced in the given modules gets that target's settings as a nested
-    table.'''
+    target can be traced in the given modules gets that target's settings as nested table.'''
     fields = signature_fields(obj, exclude)
     for field in fields:
         if 'kwargs' in field.name:
             target = trace_kwargs_target(modules, field.name)
             if target is not None:
                 field.nested = signature_fields(target)
-            # TODO: add trace hints to pyRDDLGym-jax (and the other packages) so that
-            # **kwargs settings whose target is chosen at run time (utility_kwargs,
-            # time_embedding_kwargs, reduce_on_plateau_kwargs, ...) also get a nested
-            # table; until then they are dictionaries the user types in.
+            # TODO: add trace hints to pyRDDLGym-jax (and the other packages)
     return fields
 
 
 def assign(state: FormState, section: Section, values: Dict[str, Any]) -> None:
-    '''Puts values read from a config into the form fields of a section; values that
-    match no field are kept in the section's additional settings.'''
+    '''Puts values read from a config into the form fields of a section.'''
     option = section.option(state)
 
     # choices first, since the settings nested under other fields can depend on them
@@ -79,7 +74,8 @@ def assign(state: FormState, section: Section, values: Dict[str, Any]) -> None:
         elif field.nested is not None and isinstance(value, dict) and \
                 set(value) <= {sub.name for sub in field.nested}:
             for (sub, sub_value) in value.items():
-                state.set_text(section.id, option, f'{name}.{sub}', format_value(sub_value))
+                state.set_text(
+                    section.id, option, f'{name}.{sub}', format_value(sub_value))
         elif field.nested is not None and value is not None:
             extras[name] = value
         else:
@@ -89,13 +85,12 @@ def assign(state: FormState, section: Section, values: Dict[str, Any]) -> None:
 
 
 class Provider:
-    '''A baseline shown as a settings form: its sections, how the form becomes a config
-    and a policy, and how a config becomes a form again.'''
+    '''A baseline shown as a settings form.'''
 
     kind = ''
     title = ''
-    weight_files = None  # file types of the trained weights it saves and loads, if any
-
+    weight_files = None
+    
     def sections(self) -> List[Section]:
         raise NotImplementedError
 

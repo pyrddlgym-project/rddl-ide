@@ -1,5 +1,4 @@
-'''The model behind a settings form, independent of any UI: the fields of each section,
-how values are shown and parsed, and which values the user changed.'''
+'''The model behind a settings form, independent of any UI.'''
 import ast
 import math
 from dataclasses import dataclass
@@ -19,9 +18,6 @@ _UNSET = object()
 
 @dataclass
 class Field:
-    '''One setting: an argument name, its default, and optionally the settings of the
-    function that a **kwargs dictionary setting is passed to, or the names it can be set
-    to (shown as a dropdown, and written to configs as strings).'''
     name: str
     default: Any = MISSING
     nested: Optional[List['Field']] = None
@@ -53,8 +49,7 @@ def format_value(value: Any) -> str:
 
 
 def config_literal(value: Any) -> str:
-    '''Writes a value so that the packages' config loaders (ast.literal_eval) read it
-    back: like repr, except that infinities are written as 1e309.'''
+    '''Writes a value so that the packages' config loaders read it back.'''
     if isinstance(value, float) and math.isinf(value):
         return '1e309' if value > 0 else '-1e309'
     if isinstance(value, tuple):
@@ -78,7 +73,7 @@ def parse_value(text: str) -> Any:
         return ast.literal_eval(text)
     except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
         pass
-    try:  # literals containing inf or nan, e.g. (0.0, inf)
+    try:
         tree = _InfToConstant().visit(ast.parse(text, mode='eval'))
         return ast.literal_eval(tree)
     except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
@@ -190,8 +185,7 @@ def _parsed_change(text: Optional[str], field: Field) -> Any:
 def changed_values(state: FormState, section: Section,
                    fields: Optional[List[Field]]=None) -> Dict[str, Any]:
     '''Returns the parsed values of the section that differ from their defaults, plus the
-    section's additional settings. Raises ValueError naming a required value that is
-    missing (a nested required value only counts once its table is used).'''
+    section's additional settings. Raises ValueError naming a required value missing.'''
     option = section.option(state)
     if fields is None:
         fields = section.fields(option, state)
@@ -206,13 +200,15 @@ def changed_values(state: FormState, section: Section,
             continue
         nested = {}
         for sub in field.nested:
-            value = _changed_value(state, section.id, option, f'{field.name}.{sub.name}', sub)
+            value = _changed_value(
+                state, section.id, option, f'{field.name}.{sub.name}', sub)
             if value is not _UNSET:
                 nested[sub.name] = value
         if nested:
             for sub in field.nested:
                 if sub.required and sub.name not in nested:
-                    raise ValueError(f'{section.title}: {field.name}.{sub.name} is required.')
+                    raise ValueError(
+                        f'{section.title}: {field.name}.{sub.name} is required.')
             values[field.name] = nested
     if missing:
         raise ValueError(f'{section.title}: {missing[0]} is required.')

@@ -1,6 +1,4 @@
-'''The status bar at the bottom of the window, which shows the progress of a run (the
-training metrics of a planner or learner, and the step and return of the episode), the
-cursor position and file format of the editor in use, and the Python environment.'''
+'''The status bar at the bottom of the window, which shows the progress of a run.'''
 import os
 import sys
 import time
@@ -12,9 +10,9 @@ from customtkinter import CTkFont, CTkFrame, CTkLabel, ThemeManager
 
 from rddl_ide.core.icons import Tooltip
 
-REFRESH_SECONDS = 0.1  # during a run, the window is redrawn at most this often
-SEPARATOR = '   |   '  # between the episode and the training parts of the text
-SEGMENT_PADDING = 12  # around each part of the text on the right
+REFRESH_SECONDS = 0.1
+SEPARATOR = '   |   '
+SEGMENT_PADDING = 12
 
 
 def number(value) -> str:
@@ -23,15 +21,14 @@ def number(value) -> str:
 
 
 class RunStopped(BaseException):
-    '''Raised by a progress report to end the run, when it was stopped (by closing the
-    window); not an Exception, so that the code it passes through does not handle it.'''
+    '''Raised by a progress report to end the run, when it was stopped.'''
 
 
 def environment() -> Tuple[str, str]:
     '''The Python version, environment and pyRDDLGym version, short and in full.'''
     python = '.'.join(map(str, sys.version_info[:3]))
     name = os.environ.get('CONDA_DEFAULT_ENV')
-    if name is None and sys.prefix != sys.base_prefix:  # a virtual environment
+    if name is None and sys.prefix != sys.base_prefix:
         name = os.path.basename(sys.prefix)
     try:
         pyrddlgym = f'pyRDDLGym {metadata.version("pyRDDLGym")}'
@@ -42,9 +39,7 @@ def environment() -> Tuple[str, str]:
 
 
 class StatusBar(CTkFrame):
-    '''A line of text on the frame color with a hairline above it: what the IDE is doing
-    on the left; on the right, the cursor position and file format of the editor last
-    used, and the Python environment.'''
+    '''A line of text on the frame color with a hairline above it.'''
 
     def __init__(self, master):
         palette = ThemeManager.theme['Palette']
@@ -52,8 +47,7 @@ class StatusBar(CTkFrame):
         CTkFrame(self, height=1, corner_radius=0, fg_color=palette['border']).pack(
             side='top', fill='x')
         self._font = CTkFont(size=13)
-        self._viewer = None  # whose position is shown
-        # packed first, so that a long message on the left cannot squeeze them
+        self._viewer = None
         (short, full) = environment()
         Tooltip(self._segment(short), full)
         self.newline = self._segment('')
@@ -64,8 +58,9 @@ class StatusBar(CTkFrame):
         self.label.pack(side='left', fill='x', expand=True)
 
     def _segment(self, text: str) -> CTkLabel:
-        label = CTkLabel(self, text=text, padx=SEGMENT_PADDING, height=28,
-                         text_color=ThemeManager.theme['Palette']['text'], font=self._font)
+        label = CTkLabel(
+            self, text=text, padx=SEGMENT_PADDING, height=28,
+            text_color=ThemeManager.theme['Palette']['text'], font=self._font)
         label.pack(side='right')
         return label
 
@@ -73,13 +68,12 @@ class StatusBar(CTkFrame):
         self.label.configure(text=text)
 
     def track(self, viewer) -> None:
-        '''Shows the cursor position and file format of the code viewer (a CTkCodeViewer)
-        whenever it is used.'''
+        '''Shows the cursor position and file format of the code viewer.'''
         def update(_=None):
             self._viewer = viewer
-            viewer.after_idle(self.update_position)  # after the event moved the cursor
-
-        def selected(_=None):  # also when selecting in another editor cleared this one's
+            viewer.after_idle(self.update_position)
+            
+        def selected(_=None):
             if self._viewer is viewer:
                 viewer.after_idle(self.update_position)
 
@@ -104,15 +98,12 @@ class StatusBar(CTkFrame):
             self.position.configure(text=text)
             self.encoding.configure(text=encoding)
             self.newline.configure(text=newline)
-        except TclError:  # the window was closed
+        except TclError:
             pass
 
 
 class RunProgress:
-    '''Shows the progress of one run in a status bar. The policy reports its training
-    with training(describe), and the episode reports each step with step(). The window
-    is redrawn at most every REFRESH_SECONDS, which also keeps it responding while the
-    run blocks the event loop.'''
+    '''Shows the progress of one run in a status bar.'''
 
     def __init__(self, bar: StatusBar):
         self.bar = bar
@@ -120,8 +111,8 @@ class RunProgress:
         self._describe: Optional[Callable[[], str]] = None
         self._shown_at = 0.0
         self.stopped = False
-        self.policy = None  # once built
-
+        self.policy = None
+        
     def stop(self) -> None:
         '''Ends the run at its next progress report.'''
         self.stopped = True
@@ -132,7 +123,7 @@ class RunProgress:
         parts = ['Stopped', self.episode_text, self.training_text]
         try:
             self.bar.show(SEPARATOR.join(part for part in parts if part))
-        except TclError:  # the window was destroyed
+        except TclError:
             pass
 
     def note(self, text: str) -> None:
@@ -141,9 +132,7 @@ class RunProgress:
         self.refresh(force=True)
 
     def training(self, describe: Callable[[], str]) -> None:
-        '''Reports the latest training metrics: describe() returns their text, and is
-        only called if they are shown, as training can report thousands of times a
-        second.'''
+        '''Reports the latest training metrics.'''
         self._describe = describe
         self.refresh()
 
@@ -169,9 +158,9 @@ class RunProgress:
         try:
             self.bar.show(SEPARATOR.join(parts) if parts else self.note_text)
             self.bar.update()
-        except TclError:  # the window was destroyed while it handled events
+        except TclError:
             self.stopped = True
-        if self.stopped:  # e.g. while handling events
+        if self.stopped:
             raise RunStopped()
 
     def _update_training(self) -> None:
@@ -179,6 +168,6 @@ class RunProgress:
         if self._describe is not None:
             try:
                 self.training_text = self._describe()
-            except Exception as error:  # the run goes on without the metrics
+            except Exception as error:
                 self.training_text = f'training metrics unavailable ({type(error).__name__})'
             self._describe = None

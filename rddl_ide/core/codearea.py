@@ -90,7 +90,7 @@ class CTkCodeViewer(CTkTextbox):
             self.patterns = RDDL_GRAMMAR
         self.bind("<KeyRelease>", lambda *_: self.apply())
         self.bind('<KeyPress>', self._word_boundary)
-        self.file_format = FileFormat()  # of the file the text was read from
+        self.file_format = FileFormat()
         self._style_tags()
 
     def _word_boundary(self, event):
@@ -119,11 +119,13 @@ class CTkCodeViewer(CTkTextbox):
         for (tag, _) in self.patterns:
             color = style.style_for_token(tag)['color']
             self.tag_config(str(tag), foreground='#' + color if color else '')
-        self.tag_config(ERROR_TAG, background=self._apply_appearance_mode(ERROR_BACKGROUND),
-                        underline=True,
-                        underlinefg=self._apply_appearance_mode(ERROR_UNDERLINE))
-        self.tag_lower(ERROR_TAG, 'sel')  # a selection inside the error stays visible
-
+        self.tag_config(
+            ERROR_TAG, 
+            background=self._apply_appearance_mode(ERROR_BACKGROUND),
+            underline=True, 
+            underlinefg=self._apply_appearance_mode(ERROR_UNDERLINE))
+        self.tag_lower(ERROR_TAG, 'sel')
+        
     def _set_appearance_mode(self, mode_string):
         super()._set_appearance_mode(mode_string)
         self._style_tags()
@@ -141,7 +143,7 @@ class CTkCodeViewer(CTkTextbox):
     def apply(self):
         '''Highlights the syntax, removing the highlighting of text that no longer matches.'''
         lines = self.get('1.0', 'end').splitlines()
-        for tag in {str(tag) for (tag, _) in self.patterns}:  # patterns can share a tag
+        for tag in {str(tag) for (tag, _) in self.patterns}:
             self.tag_remove(tag, '1.0', 'end')
         for (tag, pattern) in self.patterns:
             for (i, line) in enumerate(lines, 1):
@@ -163,7 +165,6 @@ class LineNumbers(tkinter.Canvas):
 
         # the text calls its yscrollcommand whenever its view changes, however scrolled
         scrollbar_set = viewer._y_scrollbar.set
-
         def scrolled(*args):
             scrollbar_set(*args)
             self.schedule()
@@ -175,11 +176,12 @@ class LineNumbers(tkinter.Canvas):
         self.bind('<MouseWheel>', lambda event: self.textbox.event_generate(
             '<MouseWheel>', delta=event.delta))
         AppearanceModeTracker.add(self.schedule, self)
-        self.bind('<Destroy>', lambda _: AppearanceModeTracker.remove(self.schedule), add='+')
+        self.bind(
+            '<Destroy>', lambda _: AppearanceModeTracker.remove(self.schedule), add='+')
         self.schedule()
 
     def _modified(self, _=None):
-        self.textbox.edit_modified(False)  # so that the next change is reported too
+        self.textbox.edit_modified(False)
         self.schedule()
 
     def schedule(self, *_):
@@ -192,11 +194,10 @@ class LineNumbers(tkinter.Canvas):
         self._pending = False
         try:
             color = self.viewer._apply_appearance_mode
-            # the text's own font description, sized in pixels: a font.Font copy of it
-            # would be sized in points, which grow if Tk's DPI setting changes later
             text_font = self.textbox.cget('font')
             last = int(self.textbox.index('end-1c').split('.')[0])
-            digits_width = int(self.tk.call('font', 'measure', text_font, '0' * len(str(last))))
+            digits_width = int(
+                self.tk.call('font', 'measure', text_font, '0' * len(str(last))))
             width = digits_width + 2 * self.PADDING
             self.configure(width=width, bg=color(self.viewer.cget('fg_color')))
             self.delete('all')
@@ -206,12 +207,12 @@ class LineNumbers(tkinter.Canvas):
             first = int(self.textbox.index('@0,0').split('.')[0])
             for line in range(first, last + 1):
                 info = self.textbox.dlineinfo(f'{line}.0')
-                if info is None:  # below the visible part
+                if info is None: 
                     break
                 self.create_text(width - self.PADDING, top + info[1], anchor='ne',
                                  text=str(line), font=text_font,
                                  fill=color(self.viewer.cget('text_color')))
-        except TclError:  # the editor was closed
+        except TclError:
             pass
 
 
@@ -224,7 +225,8 @@ def monospace_family() -> str:
     '''The first installed font of MONOSPACE_FAMILIES, else Courier, which Tk maps to a
     monospace font on every platform.'''
     installed = set(font.families())
-    return next((family for family in MONOSPACE_FAMILIES if family in installed), 'Courier')
+    return next(
+        (family for family in MONOSPACE_FAMILIES if family in installed), 'Courier')
 
 
 class CodeEditor:

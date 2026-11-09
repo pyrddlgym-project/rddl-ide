@@ -24,8 +24,8 @@ class PolicyPane(CTkFrame):
         self.body = None
         self.mode = None  # 'code', 'form' or 'unavailable'
         self.provider = self.state = None
-        self.changed = []  # called when the policy shown changes
-
+        self.changed = []
+        
     def _changed(self):
         for callback in self.changed:
             callback()
@@ -56,9 +56,10 @@ class PolicyPane(CTkFrame):
             state = provider.initial_state() if state is None else state
         except Exception as error:
             self.mode = 'unavailable'
-            self.body = CTkLabel(self, text=f'{registry.title_of(kind)} is not available:\n\n'
-                                            f'{type(error).__name__}: {error}',
-                                 justify='left', anchor='nw', wraplength=500)
+            self.body = CTkLabel(
+                self, text=f'{registry.title_of(kind)} is not available:\n\n'
+                           f'{type(error).__name__}: {error}',
+                justify='left', anchor='nw', wraplength=500)
             self.body.pack(fill='both', expand=True, padx=12, pady=12)
             self._changed()
             return
@@ -80,8 +81,8 @@ class PolicyPane(CTkFrame):
             content = self.provider.to_config(self.state)
             textfile.write(path, content, FileFormat())
         elif self.mode == 'code':
-            self.text.file_format = textfile.write(path, self.text.content(),
-                                                   self.text.file_format)
+            self.text.file_format = textfile.write(
+                path, self.text.content(), self.text.file_format)
         else:
             raise RuntimeError('There is no policy to save.')
 
@@ -103,8 +104,7 @@ class PolicyPane(CTkFrame):
     # ===========================================================================
 
     def policy(self, progress=None):
-        '''Returns build_policy(env) and required_env_args() for the policy shown; a
-        baseline reports its training to progress, a RunProgress, if given.'''
+        '''Returns build_policy(env) and required_env_args() for the policy shown.'''
         if self.mode == 'form':
             provider, state = self.provider, self.state
             return (lambda env: provider.build_policy(env, state, progress),

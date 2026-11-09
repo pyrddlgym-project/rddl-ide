@@ -1,9 +1,5 @@
 '''Toolbar icons, drawn with Pillow in the colors of the theme, and the icon buttons
-that show them with a tooltip.
-
-Each icon is drawn on a 24 x 24 grid with 2 units wide strokes, like common icon
-sets, at a large size and then reduced, which smooths its edges. CTkImage scales it to
-the screen and switches between the light and the dark versions with the theme.'''
+that show them with a tooltip.'''
 import math
 import tkinter
 from functools import lru_cache
@@ -14,14 +10,14 @@ from PIL import Image, ImageChops, ImageDraw
 
 from rddl_ide.core.popup import work_area
 
-ICON_SIZE = 18  # on screen, before DPI scaling
+ICON_SIZE = 18
 BUTTON_SIZE = 28
 GRID = 24  # the units of the drawings
 DRAWN = 384  # pixels the drawings are made at
 SOURCE = 96  # pixels the icons are reduced to, from which CTkImage scales them
 STROKE = 1.75
 TOOLTIP_FONT_SIZE = 13
-TOOLTIP_DELAY = 600  # milliseconds the pointer rests on a button before its tooltip
+TOOLTIP_DELAY = 600
 
 RECORD_COLOR = ('#d13438', '#ff6b6b')
 
@@ -44,8 +40,7 @@ class _Pen:
         self.draw.ellipse((x - r, y - r, x + r, y + r), fill=fill)
 
     def line(self, *points, radius=0.0, closed=False, width=STROKE):
-        '''A stroke through the points with round ends, its corners rounded with the
-        radius.'''
+        '''A stroke through the points with round ends, corners rounded with the radius.'''
         points = _rounded(points, radius, closed)
         if closed:
             points.append(points[0])
@@ -55,7 +50,6 @@ class _Pen:
             self._disc(point, width / 2)
 
     def polygon(self, *points, radius=1.0):
-        '''A filled polygon with rounded corners.'''
         points = _rounded(points, radius, closed=True)
         self.draw.polygon([self._xy(p) for p in points], fill=255)
 
@@ -65,7 +59,6 @@ class _Pen:
             self._disc(center, radius - width, fill=0)
 
     def erase(self, *points):
-        '''Clears a polygon, e.g. under a shape drawn over another.'''
         self.draw.polygon([self._xy(p) for p in points], fill=0)
 
 
@@ -85,7 +78,7 @@ def _rounded(points, radius, closed):
         cut = min(radius, a / 2, b / 2)
         start = _towards(corner, prev, cut / a)
         end = _towards(corner, after, cut / b)
-        for k in range(9):  # a quadratic Bezier curve with the corner as control
+        for k in range(9):
             t = k / 8
             result.append(tuple((1 - t) ** 2 * s + 2 * t * (1 - t) * c + t ** 2 * e
                                 for (s, c, e) in zip(start, corner, end)))
@@ -96,7 +89,7 @@ def _towards(p, q, fraction):
     return (p[0] + (q[0] - p[0]) * fraction, p[1] + (q[1] - p[1]) * fraction)
 
 
-def _new(pen):  # a page with a folded corner and a plus
+def _new(pen):
     pen.line((14, 2.5), (5, 2.5), (5, 21.5), (19, 21.5), (19, 7.5), radius=2)
     pen.line((19, 7.5), (14, 2.5))
     pen.line((14, 2.5), (14, 7.5), (19, 7.5), radius=1)
@@ -104,7 +97,7 @@ def _new(pen):  # a page with a folded corner and a plus
     pen.line((9, 14.5), (15, 14.5))
 
 
-def _load(pen):  # an open folder
+def _load(pen):
     pen.line((5, 20), (2.5, 20), (2.5, 4), (9, 4), (11, 6.5), (18.5, 6.5), (18.5, 9.5),
              radius=1.5)
     pen.line((5, 20), (7, 10), (21.5, 10), (19.5, 20), closed=True, radius=1.5)
@@ -120,7 +113,7 @@ def _save(pen):
     _floppy(pen)
 
 
-def _save_as(pen):  # the floppy with a pencil over its corner
+def _save_as(pen):
     _floppy(pen)
     pen.erase((10.5, 24), (10.5, 19), (21, 8.5), (24, 8.5), (24, 24))
     pen.line((13.5, 21.5), (14, 18.5), (20.5, 12), (23, 14.5), (16.5, 21), closed=True,
@@ -131,13 +124,13 @@ def _tray(pen):
     pen.line((3, 15), (3, 20.5), (21, 20.5), (21, 15), radius=1.5)
 
 
-def _load_weights(pen):  # an arrow into a tray
+def _load_weights(pen):
     _tray(pen)
     pen.line((12, 3), (12, 15))
     pen.line((7.5, 10.5), (12, 15), (16.5, 10.5))
 
 
-def _save_weights(pen):  # an arrow out of a tray
+def _save_weights(pen):
     _tray(pen)
     pen.line((12, 15), (12, 3))
     pen.line((7.5, 7.5), (12, 3), (16.5, 7.5))
@@ -155,12 +148,12 @@ def _stop(pen):
     pen.polygon((6.5, 6.5), (17.5, 6.5), (17.5, 17.5), (6.5, 17.5), radius=2)
 
 
-def _moon(pen):  # the outline of a crescent: a disc with a disc taken out
+def _moon(pen):
     (center, radius) = ((11.5, 12.5), 9)
     (cut, cut_radius) = ((17, 7), 7)
     pen._disc(center, radius)
     pen._disc(cut, cut_radius, fill=0)
-    inner = Image.new('L', pen.draw.im.size, 0)  # the crescent shrunk by the stroke
+    inner = Image.new('L', pen.draw.im.size, 0)
     shrunk = _Pen(inner)
     shrunk._disc(center, radius - STROKE)
     shrunk._disc(cut, cut_radius + STROKE, fill=0)
@@ -194,8 +187,7 @@ def _colored(name, color):
 
 
 def icon(name, colors=None, dark_name=None) -> CTkImage:
-    '''The icon in the (light, dark) colors, by default those of the text; dark_name
-    draws another icon in dark mode.'''
+    '''The icon in the (light, dark) colors.'''
     (light, dark) = colors or ThemeManager.theme['Palette']['text']
     return CTkImage(light_image=_colored(name, light),
                     dark_image=_colored(dark_name or name, dark),
@@ -225,7 +217,7 @@ class IconButton(CTkButton):
         try:
             self.configure(state='normal' if enabled else 'disabled',
                            image=self._images[0 if enabled else 1])
-        except tkinter.TclError:  # the window was closed
+        except tkinter.TclError:
             pass
 
 
@@ -237,7 +229,6 @@ class Tooltip:
         self.text = text
         self.window = None
         self._pending = None
-        # bound on the frame of the widget, which holds the parts the pointer moves over
         tkinter.Frame.bind(widget, '<Enter>', self._schedule, add='+')
         tkinter.Frame.bind(widget, '<Leave>', self._left, add='+')
         widget.bind('<ButtonPress>', lambda _: self._hide(), add=True)
@@ -249,12 +240,14 @@ class Tooltip:
     def _inside(self):
         widget = self.widget
         (x, y) = widget.winfo_pointerxy()
-        return (widget.winfo_rootx() <= x < widget.winfo_rootx() + widget.winfo_width() and
-                widget.winfo_rooty() <= y < widget.winfo_rooty() + widget.winfo_height())
+        return (
+            widget.winfo_rootx() <= x < widget.winfo_rootx() + widget.winfo_width() and
+            widget.winfo_rooty() <= y < widget.winfo_rooty() + widget.winfo_height()
+        )
 
     def _left(self, _=None):
         try:
-            if not self._inside():  # not just onto a part of the widget
+            if not self._inside():
                 self._hide()
         except tkinter.TclError:
             pass
@@ -270,12 +263,13 @@ class Tooltip:
             window.overrideredirect(True)
             window.attributes('-topmost', True)
             window.configure(bg=color(palette['popup_border']))
-            scale = self.widget._get_widget_scaling()  # a Tk label is not scaled by CTk
-            text_font = font.Font(family=CTkFont().cget('family'),
-                                  size=-round(TOOLTIP_FONT_SIZE * scale))
-            label = tkinter.Label(window, text=self.text, bg=color(palette['popup']),
-                                  fg=color(palette['text']), font=text_font,
-                                  padx=round(8 * scale), pady=round(3 * scale))
+            scale = self.widget._get_widget_scaling()
+            text_font = font.Font(
+                family=CTkFont().cget('family'), size=-round(TOOLTIP_FONT_SIZE * scale))
+            label = tkinter.Label(
+                window, 
+                text=self.text, bg=color(palette['popup']), fg=color(palette['text']), 
+                font=text_font, padx=round(8 * scale), pady=round(3 * scale))
             label.pack(padx=1, pady=1)
             x = self.widget.winfo_rootx()
             y = self.widget.winfo_rooty() + self.widget.winfo_height() + round(4 * scale)

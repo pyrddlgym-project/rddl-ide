@@ -56,8 +56,7 @@ def create(kind: str) -> Provider:
 
 
 def detect_kind(text: str) -> Optional[str]:
-    '''Which form a config belongs to: from its rddl-ide header, else from its sections
-    (a JaxPlan config without a header is taken as offline).'''
+    '''Which form a config belongs to: from its rddl-ide header, else from its sections.'''
     kind = config_kind(text)
     if kind in {k for (k, _, _) in PROVIDERS}:
         return kind

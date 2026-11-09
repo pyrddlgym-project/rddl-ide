@@ -1,9 +1,5 @@
 '''A modern popup menu, used by the menu bar and by the choosers of the policy form in
-place of Tk's native menu (which Windows draws in its classic style).
-
-It is drawn on a canvas in a borderless window: a thin border, a little inner padding,
-compact rows with a rounded hover highlight, hairline separators, a check mark on the
-current choice, and scrolling when the list is taller than the screen allows.'''
+place of Tk's native menu (which Windows draws in its classic style).'''
 import ctypes
 import sys
 import tkinter
@@ -24,8 +20,8 @@ CHECK_WIDTH = 22
 RIGHT_INSET = 28
 FONT_SIZE = 14
 SCROLLBAR_WIDTH = 6
-SCREEN_MARGIN = 8     # kept free between the popup and the screen's edges
-TYPEAHEAD_PAUSE = 1000  # ms after which typing starts a new search
+SCREEN_MARGIN = 8
+TYPEAHEAD_PAUSE = 1000
 
 
 def palette(name: str) -> str:
@@ -43,9 +39,7 @@ def _rounded_rectangle(canvas, x1, y1, x2, y2, radius, **kwargs):
 
 def work_area(widget: tkinter.Misc, x: int, y: int) -> Tuple[int, int, int, int]:
     '''The (left, top, right, bottom) of the screen at (x, y), less the taskbar, in the
-    pixels of winfo_rootx. On Windows, Tk reports the screen size unscaled by the
-    display's DPI scaling while it places windows in device pixels, so the monitor's
-    work area is asked from Windows.'''
+    pixels of winfo_rootx.'''
     if sys.platform.startswith('win'):
         try:
             from ctypes import wintypes
@@ -55,7 +49,7 @@ def work_area(widget: tkinter.Misc, x: int, y: int) -> Tuple[int, int, int, int]
                             ('rcWork', wintypes.RECT), ('dwFlags', wintypes.DWORD)]
 
             user32 = ctypes.windll.user32
-            monitor = user32.MonitorFromPoint(wintypes.POINT(x, y), 2)  # the nearest
+            monitor = user32.MonitorFromPoint(wintypes.POINT(x, y), 2)
             info = MonitorInfo(cbSize=ctypes.sizeof(MonitorInfo))
             if user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
                 work = info.rcWork
@@ -67,12 +61,10 @@ def work_area(widget: tkinter.Misc, x: int, y: int) -> Tuple[int, int, int, int]
 
 class PopupMenu:
     '''Shows items (label, command) and SEPARATORs below the anchor widget until one is
-    chosen, a click lands outside, Escape is pressed or the window moves.
+    chosen, a click lands outside, Escape is pressed or the window moves.'''
 
-    on_pointer(x_root, y_root) is called as the pointer moves outside the popup; it
-    returns True if it took over (e.g. the menu bar opened a neighbouring menu).'''
-
-    def __init__(self, anchor: tkinter.Misc, items: List[Item], selected: Optional[str]=None,
+    def __init__(self, anchor: tkinter.Misc, items: List[Item], 
+                 selected: Optional[str]=None,
                  min_width: int=0, on_close: Optional[Callable[[], None]]=None,
                  on_pointer: Optional[Callable[[int, int], bool]]=None):
         self.anchor = anchor
@@ -80,7 +72,8 @@ class PopupMenu:
         self.on_close = on_close
         self.on_pointer = on_pointer
         self.closed = False
-        scale = anchor._get_widget_scaling() if hasattr(anchor, '_get_widget_scaling') else 1.0
+        scale = anchor._get_widget_scaling() if hasattr(anchor, '_get_widget_scaling') \
+            else 1.0
         s = lambda value: max(1, round(value * scale))
         self.row_height = s(ROW_HEIGHT)
 
@@ -100,22 +93,25 @@ class PopupMenu:
                 y += s(ROW_HEIGHT)
         total = y + pad
 
-        # the height: all the items if the screen has room for them, else as many as fit
-        # (scrolling then shows the others)
-        (x, below, above) = (anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height(),
-                             anchor.winfo_rooty())
+        # the height
+        (x, below, above) = (
+            anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height(),
+            anchor.winfo_rooty()
+        )
         (left, top, right, bottom) = work_area(anchor, x, above)
         (gap, margin) = (s(2), s(SCREEN_MARGIN))
         room = bottom - top - 2 * margin - 2
-        if room < total <= room + pad:  # all rows fit without the bottom padding
+        if room < total <= room + pad:
             total = room
         height = min(total, room)
         self.scrollable = total > height
         self.scrollbar_width = s(SCROLLBAR_WIDTH) if self.scrollable else 0
 
         labels = [item[0] for item in items if item is not SEPARATOR]
-        width = max([min_width, s(160)] + [text_x + self.font.measure(label) + s(RIGHT_INSET)
-                                            for label in labels]) + self.scrollbar_width
+        width = max([min_width, s(160)] + [
+            text_x + self.font.measure(label) + s(RIGHT_INSET)
+            for label in labels
+        ]) + self.scrollbar_width
 
         # the place: below the anchor, else above it, else wherever it fits on the screen
         if below + gap + height + 2 <= bottom - margin:
@@ -130,7 +126,7 @@ class PopupMenu:
         self.window = window = tkinter.Toplevel(anchor)
         window.withdraw()
         window.overrideredirect(True)
-        window.attributes('-topmost', True)  # also above an app window kept on top
+        window.attributes('-topmost', True)
         window.configure(bg=palette('popup_border'))
         window.geometry(f'{width + 2}x{height + 2}+{x}+{y_window}')
         self.canvas = canvas = tkinter.Canvas(
@@ -143,7 +139,8 @@ class PopupMenu:
         row_right = width - pad - self.scrollbar_width
         for (row_top, row_bottom, i) in self.rows:
             self.highlights[i] = _rounded_rectangle(
-                canvas, pad, row_top + 1, row_right, row_bottom - 1, s(4), fill='', outline='')
+                canvas, pad, row_top + 1, row_right, row_bottom - 1, s(4), 
+                fill='', outline='')
             middle = (row_top + row_bottom) // 2
             canvas.create_text(text_x, middle, anchor='w', text=items[i][0],
                                font=self.font, fill=palette('text'))
@@ -151,14 +148,14 @@ class PopupMenu:
                 canvas.create_text(s(TEXT_INSET), middle, anchor='w', text='✓',
                                    font=self.font, fill=palette('accent'))
         for middle in separators:
-            canvas.create_line(s(10), middle, width - s(10), middle, fill=palette('border'))
+            canvas.create_line(
+                s(10), middle, width - s(10), middle, fill=palette('border'))
         self.thumb = canvas.create_rectangle(0, 0, 0, 0, fill='', outline='')
-        self.dragging = None  # (pointer y, view fraction) where a thumb drag started
-        self.pressed = False  # whether the button went down in the popup
+        self.dragging = None
+        self.pressed = False
         self.typed, self.typed_at = '', 0
 
-        # pointer events are handled from screen coordinates at the window, which holds
-        # the grab, so that they are handled alike wherever the pointer is
+        # pointer events are handled from screen coordinates at the window
         self.hovered = None
         window.bind('<Motion>', self._motion)
         window.bind('<ButtonPress>', self._press)
@@ -179,8 +176,9 @@ class PopupMenu:
         window.lift()
         window.focus_force()
         self._grab()
-        if selected is not None:  # show the current choice
-            self._reveal(next((i for (_, _, i) in self.rows if items[i][0] == selected), None))
+        if selected is not None:
+            self._reveal(
+                next((i for (_, _, i) in self.rows if items[i][0] == selected), None))
         self._draw_thumb()
 
     # ===========================================================================
@@ -191,11 +189,13 @@ class PopupMenu:
         if not self._inside(x_root, y_root) or self._on_scrollbar(x_root):
             return None
         y_canvas = self.canvas.canvasy(y_root - self.canvas.winfo_rooty())
-        return next((i for (top, bottom, i) in self.rows if top <= y_canvas < bottom), None)
+        return next(
+            (i for (top, bottom, i) in self.rows if top <= y_canvas < bottom), None)
 
     def _on_scrollbar(self, x_root) -> bool:
         x = x_root - self.canvas.winfo_rootx()
-        return self.scrollable and x >= int(self.canvas.cget('width')) - self.scrollbar_width - 2
+        return self.scrollable \
+            and x >= int(self.canvas.cget('width')) - self.scrollbar_width - 2
 
     def _highlight(self, index) -> None:
         if index == self.hovered:
@@ -208,11 +208,13 @@ class PopupMenu:
 
     def _inside(self, x_root, y_root) -> bool:
         w = self.window
-        return w.winfo_rootx() <= x_root < w.winfo_rootx() + w.winfo_width() and \
+        return (
+            w.winfo_rootx() <= x_root < w.winfo_rootx() + w.winfo_width() and \
             w.winfo_rooty() <= y_root < w.winfo_rooty() + w.winfo_height()
+        )
 
     def _motion(self, event) -> None:
-        if self.dragging is not None:  # dragging the scrollbar's thumb
+        if self.dragging is not None:
             (y_start, first_start) = self.dragging
             track = int(self.canvas.cget('height')) - 6
             self.canvas.yview_moveto(first_start + (event.y_root - y_start) / track)
@@ -225,12 +227,11 @@ class PopupMenu:
     def _press(self, event) -> None:
         if not self._inside(event.x_root, event.y_root):
             self.close()
-        elif event.num in (4, 5):  # the mouse wheel on X11
+        elif event.num in (4, 5):
             self._scroll(3 * self.row_height * (-1 if event.num == 4 else 1))
         elif event.num == 1:
             self.pressed = True
             if self._on_scrollbar(event.x_root):
-                # a click on the track moves the thumb there; then the thumb follows drags
                 (first, last) = self.canvas.yview()
                 track = int(self.canvas.cget('height')) - 6
                 y = event.y_root - self.canvas.winfo_rooty() - 3
@@ -240,8 +241,6 @@ class PopupMenu:
                 self.dragging = (event.y_root, self.canvas.yview()[0])
 
     def _release(self, event) -> None:
-        # only a click made in the popup chooses: the release of the click that opened
-        # it can land on a row too, as a long list may open over its anchor
         (pressed, self.pressed) = (self.pressed, False)
         if self.dragging is not None:
             self.dragging = None
@@ -249,9 +248,9 @@ class PopupMenu:
             self._choose(self._row_at(event.x_root, event.y_root))
 
     def _wheel(self, event) -> None:
-        if sys.platform == 'darwin':  # macOS reports small steps
+        if sys.platform == 'darwin':
             self._scroll(-event.delta * self.row_height // 2)
-        else:  # Windows reports 120 per notch
+        else:
             self._scroll(-round(event.delta / 120 * 3 * self.row_height))
 
     def _scroll(self, pixels) -> None:
@@ -316,9 +315,7 @@ class PopupMenu:
             fill=palette('scrollbar'))
 
     def _grab(self, attempts: int=50) -> None:
-        '''Grabs the pointer, so that clicks outside the popup reach it (and close it).
-        On X11 a window is shown asynchronously, and grabbing it before it is viewable
-        fails, so this retries until it is.'''
+        '''Grabs the pointer, so that clicks outside the popup reach it (and close it).'''
         if self.closed:
             return
         try:
@@ -328,15 +325,13 @@ class PopupMenu:
                 self.window.after(10, lambda: self._grab(attempts - 1))
 
     def _keep_focus(self, _) -> None:
-        '''Takes the focus back when another widget of the app gets it, as Windows gives it
-        to the clicked widget after the click that opened the popup: the keys and the
-        mouse wheel go to the widget with the focus, not to the one holding the grab.'''
+        '''Takes the focus back when another widget of the app gets it.'''
         def refocus():
             if self.closed:
                 return
             try:
-                focus = self.window.focus_get()  # None when another app has the focus
-            except KeyError:  # a native dialog has it, which tkinter has no widget for
+                focus = self.window.focus_get()
+            except KeyError:
                 return
             if focus is not None and focus.winfo_toplevel() is not self.window:
                 self.window.focus_force()
@@ -382,15 +377,14 @@ class ChoiceMenu(CTkOptionMenu):
     '''A CTkOptionMenu whose list opens as a PopupMenu.'''
 
     def _open_dropdown_menu(self):
-        self.popup = PopupMenu(self, [(value, lambda value=value: self._dropdown_callback(value))
-                                      for value in self._values],
-                               selected=self._current_value, min_width=self.winfo_width())
+        self.popup = PopupMenu(
+            self, [(value, lambda value=value: self._dropdown_callback(value))
+                   for value in self._values],
+            selected=self._current_value, min_width=self.winfo_width())
 
 
 class MenuBarMenu:
-    '''A menu of a CTkMenuBar, opened by its button; moving the pointer over another
-    button of the bar while a menu is open opens that button's menu instead. Has the
-    add_option / add_separator interface of CTkMenuBar's CustomDropdownMenu.'''
+    '''A menu of a CTkMenuBar, opened by its button.'''
 
     _menus: List['MenuBarMenu'] = []
 
@@ -427,9 +421,11 @@ class MenuBarMenu:
     def _pointer(self, x_root, y_root) -> bool:
         for menu in MenuBarMenu._menus:
             button = menu.button
-            if menu is not self and button.winfo_toplevel() is self.button.winfo_toplevel() and \
-                    button.winfo_rootx() <= x_root < button.winfo_rootx() + button.winfo_width() and \
-                    button.winfo_rooty() <= y_root < button.winfo_rooty() + button.winfo_height():
+            if (menu is not self and 
+                button.winfo_toplevel() is self.button.winfo_toplevel() and
+                button.winfo_rootx() <= x_root < button.winfo_rootx() + button.winfo_width() and
+                button.winfo_rooty() <= y_root < button.winfo_rooty() + button.winfo_height()
+            ):
                 menu.open()
                 return True
         return False
