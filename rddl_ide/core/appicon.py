@@ -11,10 +11,10 @@ def set_icon(window: tkinter.Wm) -> None:
     '''Windows reads the .ico itself; elsewhere Tk takes iconbitmap names as X bitmaps.'''
     try:
         if sys.platform.startswith('win'):
-            window.iconbitmap(ICON)
+            window.iconbitmap(default=ICON)
             return
         from PIL import Image, ImageTk
         window._app_icon = ImageTk.PhotoImage(Image.open(ICON), master=window)
-        window.iconphoto(False, window._app_icon)
+        window.iconphoto(True, window._app_icon)
     except (ImportError, OSError, tkinter.TclError):
         pass

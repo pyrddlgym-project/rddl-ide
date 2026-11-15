@@ -4,7 +4,7 @@ import sys
 import time
 from importlib import metadata
 from tkinter import TclError
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 
 from customtkinter import CTkFont, CTkFrame, CTkLabel, ThemeManager
 
@@ -18,6 +18,24 @@ SEGMENT_PADDING = 12
 def number(value) -> str:
     '''A metric (a float or a scalar array) with 5 significant digits.'''
     return f'{float(value):.5g}'
+
+
+# spaces as wide as a digit and as a decimal point, and a minus as wide as a digit, in a
+# font whose digits have one width (e.g. Roboto of the status bar)
+(FIGURE_SPACE, PUNCTUATION_SPACE, MINUS) = (' ', ' ', '−')
+
+
+def aligned(text: str, figures: int) -> str:
+    '''The text of a number padded on the left to the width of the figures and a decimal
+    point, so that progress reported in its place does not move as the number changes.'''
+    text = text.replace('-', MINUS)
+    padding = FIGURE_SPACE * max(0, figures - len(text.replace('.', '')))
+    return padding + ('' if '.' in text else PUNCTUATION_SPACE) + text
+
+
+def fixed(value) -> str:
+    '''A metric as number() shows it, in a width that does not change with its value.'''
+    return aligned(number(value), 6)
 
 
 class RunStopped(BaseException):
@@ -125,7 +143,8 @@ class RunProgress:
     def __init__(self, bar: StatusBar):
         self.bar = bar
         self.note_text = self.training_text = self.episode_text = ''
-        self._describe: Optional[Callable[[], str]] = None
+        self.training_details = ''
+        self._describe: Optional[Callable[[], Union[str, Tuple[str, str]]]] = None
         self._shown_at = 0.0
         self.stopped = False
         self.policy = None
@@ -139,7 +158,7 @@ class RunProgress:
         self._update_training()
         parts = ['Stopped', self.episode_text, self.training_text]
         try:
-            self.bar.show(SEPARATOR.join(part for part in parts if part))
+            self.bar.show(SEPARATOR.join(part for part in parts if part), self._details())
         except TclError:
             pass
 
@@ -148,17 +167,19 @@ class RunProgress:
         self.note_text = text
         self.refresh(force=True)
 
-    def training(self, describe: Callable[[], str]) -> None:
-        '''Reports the latest training metrics.'''
+    def training(self, describe: Callable[[], Union[str, Tuple[str, str]]]) -> None:
+        '''Reports the latest training metrics: describe() returns their text, or their
+        text and the details shown when the pointer rests on it.'''
         self._describe = describe
         self.refresh()
 
     def step(self, step: int, horizon: int, reward, total,
              episode: Optional[Tuple[int, int]]=None) -> None:
         '''Reports a step of the episode, which is (number, of how many) if several.'''
-        prefix = '' if episode is None else f'Episode {episode[0]}/{episode[1]} · '
-        self.episode_text = f'{prefix}Step {step}/{horizon} · reward {number(reward)} · ' \
-                            f'return {number(total)}'
+        prefix = '' if episode is None else \
+            f'Episode {aligned(str(episode[0]), len(str(episode[1])))}/{episode[1]} · '
+        self.episode_text = f'{prefix}Step {aligned(str(step), len(str(horizon)))}/' \
+                            f'{horizon} · reward {fixed(reward)} · return {fixed(total)}'
         self.refresh()
 
     def finish(self, text: str) -> None:
@@ -176,7 +197,7 @@ class RunProgress:
         self._update_training()
         parts = [part for part in (self.episode_text, self.training_text) if part]
         try:
-            self.bar.show(SEPARATOR.join(parts) if parts else self.note_text)
+            self.bar.show(SEPARATOR.join(parts) if parts else self.note_text, self._details())
             self.bar.update()
         except TclError:
             self.stopped = True
@@ -187,7 +208,13 @@ class RunProgress:
         '''Describes the latest training metrics reported, if not yet described.'''
         if self._describe is not None:
             try:
-                self.training_text = self._describe()
+                described = self._describe()
+                (self.training_text, self.training_details) = \
+                    described if isinstance(described, tuple) else (described, '')
             except Exception as error:
                 self.training_text = f'training metrics unavailable ({type(error).__name__})'
+                self.training_details = ''
             self._describe = None
+
+    def _details(self) -> str:
+        return self.training_details if self.training_text else ''

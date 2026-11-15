@@ -4,19 +4,20 @@ import functools
 import inspect
 import os
 import pickle
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import optax
 import pyRDDLGym_jax
 from pyRDDLGym_jax.core import config, controller, logic, plan, planner
+from pyRDDLGym_jax.core import progress as progress_display
 
 from rddl_ide.core.settings.introspect import concrete_subclasses, signature_fields
 from rddl_ide.core.settings.model import Field, FormState, Section, format_value
 from rddl_ide.core.settings.provider import (
     Provider, assign, fields_with_traced_kwargs, read_config, write_config
 )
-from rddl_ide.core.statusbar import number
+from rddl_ide.core.statusbar import aligned, fixed
 
 # arguments a config cannot set: objects that the config loader or the planner supply
 NOT_CONFIGURABLE_COMPILER = {'rddl', 'logger', 'python_functions'}
@@ -36,6 +37,9 @@ OPTIMIZER_ARGS = ('optimizer', 'optimizer_sigma')
 OPTIMIZER_KWARGS = 'optimizer_kwargs'
 
 TRACE_MODULES = (planner, plan, logic)
+
+# a number the progress display of the planner shows
+_FLOAT = re.compile(r'-?\d+\.\d+(?:e[-+]?\d+)?')
 
 # the configs that ship with pyRDDLGym-jax: <problem>_<method>.cfg and default_<method>.cfg
 CONFIGS = os.path.join(os.path.dirname(pyRDDLGym_jax.__file__), 'examples', 'configs')
@@ -297,21 +301,85 @@ class JaxPlanProvider(Provider):
         state.set_text(section.id, section.option(state), 'params', format_value(path))
 
 
-def _report_training(jax_planner, progress, caption: str) -> None:
-    '''Reports every iteration of the planner's training to progress.'''
-    generate = jax_planner.optimize_generator
+class _StatusDisplay(progress_display.JaxPlannerProgress):
+    '''The progress display of the planner, whose latest statistics the status bar shows:
+    drawn in the terminal too only if the planner was asked to print its progress.'''
 
-    def describe(callback) -> str:
-        test = np.ravel(callback['test_return'])
-        index = int(np.argmax(test))
-        train = np.ravel(callback['train_return'])[index]
-        return (f'{caption} {int(callback["progress"])}% · '
-                f'iter {callback["iteration"]} · {callback["elapsed_time"]:.1f} s · '
-                f'train {number(train)} · test {number(test[index])} · '
-                f'best {number(callback["best_return"])}')
+    def __init__(self, position, check_preconditions, draw: bool) -> None:
+        super().__init__(position, check_preconditions)
+        self.draw = draw
+
+    def start(self) -> None:
+        if self.draw:
+            super().start()
+
+    def stop(self) -> None:
+        if self.draw:
+            super().stop()
+
+    def update(self, *state) -> None:
+        if self.draw:
+            super().update(*state)
+        else:
+            self._state = state
+
+    def describe(self, caption: str) -> Tuple[str, str]:
+        '''The statistics of the display: the key ones on one line, and all of them as
+        details shown when the pointer rests on the line.'''
+        state = self._state
+        if state is None:
+            return (f'{caption}: compiling...', '')
+        (it, percent, elapsed) = state[:3]
+        time = progress_display._format_seconds(elapsed)
+        groups = [[(name, value.strip()) for (name, value, _) in group]
+                  for group in self._groups(state)]
+
+        # the line keeps its numbers in place
+        def short(name, value):
+            if name == 'status':
+                return value.lower().replace('_', ' ')
+            who = value[0] if value[:1] in ('*', 'A') else ''
+            value = _FLOAT.sub(lambda match: fixed(match[0]), value[len(who):].strip())
+            return f'{name} {value} {who}'.rstrip()
+
+        line = [f'{caption} {aligned(f"{percent:.0f}", 3)}% · {time} · '
+                f'{aligned(str(it), 4)} it'] + [short(*column) for column in groups[0]]
+        details = [f'{caption} {percent:.0f}% · {time} · {it} it · '
+                   f'{(it + 1) / (elapsed + 1e-6):.1f} it/s'] + [
+            ' · '.join(f'{name} {value}' for (name, value) in group) for group in groups]
+        return (' · '.join(line), '\n'.join(details))
+
+
+def _report_training(jax_planner, progress, caption: str) -> None:
+    '''Reports every iteration of the planner's training to progress, with the statistics
+    of the planner's own progress display.'''
+    generate = jax_planner.optimize_generator
+    parameters = inspect.signature(generate)
 
     def optimize_generator(*args, **kwargs):
-        for callback in generate(*args, **kwargs):
-            progress.training(lambda: describe(callback))
-            yield callback
+        arguments = parameters.bind(*args, **kwargs)
+        arguments.apply_defaults()
+        draw = arguments.arguments['print_progress']
+        arguments.arguments['print_progress'] = True
+        display = None
+
+        def create(*args):
+            nonlocal display
+            display = _StatusDisplay(*args, draw=draw)
+            return display
+
+        # the planner creates its display when it starts, in the first step of the generator
+        callbacks = generate(*arguments.args, **arguments.kwargs)
+        try:
+            planner.JaxPlannerProgress = create
+            try:
+                callback = next(callbacks, None)
+            finally:
+                planner.JaxPlannerProgress = progress_display.JaxPlannerProgress
+            while callback is not None:
+                progress.training(lambda: display.describe(caption))
+                yield callback
+                callback = next(callbacks, None)
+        finally:
+            callbacks.close()
     jax_planner.optimize_generator = optimize_generator

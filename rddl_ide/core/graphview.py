@@ -41,6 +41,8 @@ KINDS = {
     REWARD: ('Reward', ('#CF222E', '#F85149')),
 }
 FILL_TINT = 0.14
+IRRELEVANT = 'Irrelevant'
+IRRELEVANT_DASH = (4, 3)
 HINT = 'Point at a fluent to see what it depends on and what uses it; ' \
        'click it to go to its definition.'
 
@@ -261,7 +263,8 @@ class DependencyWindow(CTkToplevel):
             tag = f'node{len(self.nodes)}'
             shape = canvas.create_polygon(
                 _rounded_rectangle(x1, y1, x2, y2, 6 * scale), smooth=True,
-                width=max(1, round(scale)), tags=('node', tag))
+                width=max(1, round(scale)), tags=('node', tag),
+                dash=() if node.relevant else IRRELEVANT_DASH)
             text = canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2, text=node.name,
                                       font=self._font, tags=('node', tag))
             self.nodes[node.name] = (shape, text)
@@ -286,6 +289,7 @@ class DependencyWindow(CTkToplevel):
         for (dep, name, _) in self.edges:
             if hovered in (dep, name):
                 related.update((dep, name))
+        irrelevant = {node.name for node in self.graph.nodes if not node.relevant}
         canvas = self.canvas
         scale = ScalingTracker.get_widget_scaling(self)
         for node in self.graph.nodes:
@@ -296,16 +300,18 @@ class DependencyWindow(CTkToplevel):
                                      outline=self._color(palette['border']))
                 canvas.itemconfigure(label, fill=muted)
             else:
-                canvas.itemconfigure(shape, fill=_mix(color, background, FILL_TINT * (
-                    2 if node.name == hovered else 1)), outline=color)
-                canvas.itemconfigure(label, fill=text)
+                tint = 2 if node.name == hovered else 1 if node.relevant else 0
+                canvas.itemconfigure(shape, fill=_mix(color, background, FILL_TINT * tint),
+                                     outline=color if node.relevant else muted)
+                canvas.itemconfigure(label, fill=text if node.relevant else muted)
         for (dep, name, item) in self.edges:
             if hovered in (dep, name):
                 canvas.itemconfigure(item, fill=accent, width=2 * scale)
                 canvas.tag_raise(item)
             else:
+                faded = hovered or name in irrelevant
                 canvas.itemconfigure(item, fill=_mix(edge, background, 0.35)
-                                     if hovered else edge, width=max(1, round(scale)))
+                                     if faded else edge, width=max(1, round(scale)))
         canvas.tag_raise('node')
 
     def _hover(self, node: Optional[Node]) -> None:
@@ -319,7 +325,10 @@ class DependencyWindow(CTkToplevel):
             kind = KINDS.get(node.kind, (node.kind,))[0]
             self.footer.show(f'{kind}  {node.signature}   ·   depends on: '
                              f'{", ".join(uses) or "nothing"}   ·   used by: '
-                             f'{", ".join(used_by) or "nothing"}')
+                             f'{", ".join(used_by) or "nothing"}' + (
+                                 '' if node.relevant else
+                                 '   ·   irrelevant: affects no reward, termination, '
+                                 'precondition or observation'))
         self._paint()
 
     def _draw_legend(self) -> None:
@@ -336,6 +345,12 @@ class DependencyWindow(CTkToplevel):
                 CTkLabel(self.legend, text=name, text_color=palette['text'], width=0,
                          padx=0, font=CTkFont(size=FONT_SIZE)).pack(
                     side='left', padx=(0, 14))
+        if not all(node.relevant for node in self.graph.nodes):
+            CTkLabel(self.legend, text='□', text_color=palette['text_muted'], width=0,
+                     padx=0, font=CTkFont(size=FONT_SIZE)).pack(side='left', padx=(0, 4))
+            CTkLabel(self.legend, text=IRRELEVANT, text_color=palette['text_muted'],
+                     width=0, padx=0, font=CTkFont(size=FONT_SIZE)).pack(
+                side='left', padx=(0, 14))
 
     def _place_message(self) -> None:
         if getattr(self, '_message', None) is not None:
