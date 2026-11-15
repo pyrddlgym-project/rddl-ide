@@ -2,14 +2,15 @@ import os
 import sys
 import traceback
 import webbrowser
-from tkinter import TclError, messagebox
+from tkinter import TclError, font, messagebox
 from customtkinter import (
-    StringVar, CTkButton, CTkCheckBox, CTkEntry, CTkFrame, ThemeManager
+    StringVar, CTkButton, CTkCheckBox, CTkEntry, CTkFont, CTkFrame, CTkTextbox,
+    ScalingTracker, ThemeManager
 )
 from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
-from rddl_ide.core.checking import check
+from rddl_ide.core.checking import check, summarize
 from rddl_ide.core.dialog import Dialog
 from rddl_ide.core.findbar import FindBar
 from rddl_ide.core.errorlocation import locate_error, strip_ansi
@@ -28,6 +29,7 @@ from rddl_ide.core import textfile
 
 DOCS_URL = 'https://pyrddlgym.readthedocs.io/en/latest/'
 ISSUES_URL = 'https://github.com/pyrddlgym-project/rddl-ide/issues'
+(SUMMARY_WIDTH, SUMMARY_HEIGHT) = (560, 560)
 
 
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
@@ -260,6 +262,57 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             highlight_error(str(error))
             return
         status_bar.show(result.summary, result.details)
+
+    def show_summary():
+        '''Shows the size and constraints of the domain and instance in the editors.'''
+        for editor in (domain_editor, inst_editor):
+            editor.clear_error()
+        status_bar.show('Summarizing the domain and instance...')
+        status_bar.update_idletasks()
+        try:
+            sections = summarize(domain_editor.content(), inst_editor.content())
+        except Exception as error:
+            status_bar.show(f'Summary failed: {type(error).__name__}')
+            _show_error('Could not summarize the domain and instance', error)
+            highlight_error(str(error))
+            return
+        status_bar.show('Ready')
+        dialog = Dialog(root, 'Problem Summary')
+        scale = ScalingTracker.get_widget_scaling(dialog)
+        family = CTkFont().cget('family')
+        (plain, bold) = (font.Font(family=family, size=-round(13 * scale), weight=weight)
+                         for weight in ('normal', 'bold'))
+        dialog.fonts = (plain, bold)
+        tab = max(plain.measure(name) 
+                  for (_, rows) in sections for (name, _) in rows) + round(16 * scale)
+        box = CTkTextbox(dialog.body, width=SUMMARY_WIDTH, wrap='word',
+                         fg_color='transparent', border_width=0)
+        box.grid(row=0, column=0, columnspan=2, sticky='nsew')
+        text = box._textbox
+        text.configure(font=plain, tabs=(tab,), cursor='arrow')
+        text.tag_configure('heading', font=bold, spacing1=round(12 * scale),
+                           spacing3=round(4 * scale))
+        text.tag_configure('row', lmargin2=tab, spacing1=round(3 * scale))
+        for (title, rows) in sections:
+            text.insert('end', title + '\n', 'heading')
+            for (name, value) in rows:
+                text.insert(
+                    'end', f'{name}\t{value.replace(chr(10), chr(10) + chr(9))}\n', 'row')
+        text.delete('end-1c')
+        text.configure(state='disabled')
+        dialog.update_idletasks()
+        height = text.tk.getint(text.tk.call(
+            text, 'count', '-update', '-ypixels', '1.0', 'end')) + round(8 * scale)
+        box.configure(height=min(height / scale, SUMMARY_HEIGHT))
+
+        def copy():
+            root.clipboard_clear()
+            root.clipboard_append('\n\n'.join(
+                title + '\n' + '\n'.join(f'{name}: {text}' for (name, text) in rows)
+                for (title, rows) in sections))
+            status_bar.show('Copied the problem summary')
+
+        dialog.buttons('Copy', copy, cancel='Close')
 
     # UNSAVED changes: asked about before they are replaced or the window is closed
     def confirm_discard(*names) -> bool:
@@ -879,11 +932,10 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     domain_menu_file_drop.add_option('Check Domain and Instance', check_problem, CHECK)
     domain_menu_file_drop.add_option('Ground Domain and Instance', ground_problem)
     domain_menu_file_drop.add_option('Show Dependency Graph', show_dependencies)
+    domain_menu_file_drop.add_option('Show Problem Summary', show_summary)
     domain_menu_file_drop.add_separator()
     domain_menu_file_drop.add_option(
         'Register Domain in rddlrepository...', register_domain)
-    domain_menu_file_drop.add_separator()
-    domain_menu_file_drop.add_option('Exit', exit_application)
 
     # instance menu
     inst_menu_file = menu.add_cascade("Instance")
@@ -1002,6 +1054,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     domain_pane.header.add_button(
         'check', f'Check domain and instance ({CHECK})', check_problem)
     domain_pane.header.add_button('graph', 'Show dependency graph', show_dependencies)
+    domain_pane.header.add_button('summary', 'Show problem summary', show_summary)
 
     policy_header = policy_pane.header
     policy_header.add_button('load', 'Load policy from file', load_policy_from_file)

@@ -38,11 +38,12 @@ class Dialog(CTkToplevel):
         self._rows += 1
         return widget
 
-    def buttons(self, text: str, action: Callable[[], None]) -> None:
-        '''Shows Cancel and the button doing the action.'''
+    def buttons(self, text: str, action: Callable[[], None], cancel: str='Cancel') -> None:
+        '''Shows the cancel button, which closes the dialog, and the button doing the
+        action.'''
         row = CTkFrame(self, fg_color='transparent')
         row.grid(row=1, column=0, sticky='e', padx=PADDING, pady=(8, PADDING))
-        CTkButton(row, text='Cancel', width=BUTTON_WIDTH, fg_color='transparent',
+        CTkButton(row, text=cancel, width=BUTTON_WIDTH, fg_color='transparent',
                   hover_color=ThemeManager.theme['Palette']['hover'],
                   command=self.destroy).pack(side='left', padx=(0, 8))
         CTkButton(row, text=text, width=BUTTON_WIDTH, command=action).pack(side='left')
