@@ -315,6 +315,28 @@ def _sun(pen):
         pen.line((12 + 7.5 * dx, 12 + 7.5 * dy), (12 + 9.5 * dx, 12 + 9.5 * dy))
 
 
+def _bug(pen):
+    '''A beetle: a body split down the middle, a head, six legs and two antennae.'''
+    pen.line((7.5, 10), (16.5, 10), (16.5, 21), (7.5, 21), closed=True, radius=4.5)
+    pen.line((12, 13), (12, 21))
+    pen.line(*_arc((12, 10), (3, 3), 180, 360))
+    for (inner, outer) in (((7.5, 12), (4, 10)), ((7.5, 15.5), (3, 15.5)),
+                           ((7.5, 19), (4, 21))):
+        pen.line(inner, outer)
+        pen.line((24 - inner[0], inner[1]), (24 - outer[0], outer[1]))
+    pen.line((10, 7.5), (8, 3.5))
+    pen.line((14, 7.5), (16, 3.5))
+
+
+def _docs(pen):
+    '''An open book.'''
+    for side in (1, -1):
+        x = lambda v: 12 + side * v
+        pen.line((x(0), 6), (x(0), 20.5))
+        pen.line((x(0), 6), (x(2.5), 4.5), (x(9.5), 4.5), (x(9.5), 18.5), (x(2.5), 18.5),
+                 (x(0), 20.5), radius=1.5)
+
+
 DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save,
             'save_as': _save_as,
             'load_weights': _load_weights, 'save_weights': _save_weights, 'run': _run,
@@ -323,7 +345,8 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'goto': _goto, 'check': _check, 'up': _up, 'down': _down, 'close': _close,
             'wrap': _wrap, 'moon': _moon, 'sun': _sun, 'graph': _graph,
             'options': _options, 'refresh': _refresh, 'restart': _restart,
-            'step': _step, 'run_to_end': _run_to_end, 'more': _more}
+            'step': _step, 'run_to_end': _run_to_end, 'more': _more, 'bug': _bug,
+            'docs': _docs}
 
 
 @lru_cache(maxsize=None)

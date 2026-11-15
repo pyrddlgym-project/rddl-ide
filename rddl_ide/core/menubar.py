@@ -1,6 +1,7 @@
 import os
 import sys
 import traceback
+import webbrowser
 from tkinter import TclError, messagebox
 from customtkinter import (
     StringVar, CTkButton, CTkCheckBox, CTkEntry, CTkFrame, ThemeManager
@@ -24,6 +25,9 @@ from rddl_ide.core.statusbar import RunProgress, RunStopped
 from rddl_ide.core.stepperview import StepperWindow
 from rddl_ide.core.stepping import Stepper
 from rddl_ide.core import textfile
+
+DOCS_URL = 'https://pyrddlgym.readthedocs.io/en/latest/'
+ISSUES_URL = 'https://github.com/pyrddlgym-project/rddl-ide/issues'
 
 
 def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
@@ -83,9 +87,17 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             _pane_from_file(inst_pane, inst_editor, 'Instance', inst_file)
     
     
-    def open_from_dialog():
-        nonlocal domain_file, inst_file, viz
-        dialog = Dialog(root, 'Load from rddlrepository')
+    def open_from_dialog(instance_only=False):
+        '''Loads a domain and instance from rddlrepository or, if instance_only, another
+        instance of the rddlrepository domain loaded.'''
+        if instance_only and problem is None:
+            messagebox.showinfo(
+                'Load Instance from rddlrepository', 'The domain was not loaded from '
+                'rddlrepository: load it with Load Domain from rddlrepository first.',
+                parent=root)
+            return
+        dialog = Dialog(root, 'Load instance from rddlrepository' if instance_only
+                        else 'Load from rddlrepository')
         master = dialog.body
         
         def changed_context(*args):
@@ -127,11 +139,27 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         dialog.field('Domain', domain_dropdown)
         dialog.field('Instance', instance_dropdown)
 
+        # only the instance changes: the context and domain are those of the domain loaded
+        if instance_only:
+            context_var.set(next(context for context in context_options
+                                 if problem in manager.list_problems_by_context(context)))
+            domain_var.set(problem)
+            for dropdown in (context_dropdown, domain_dropdown):
+                dropdown.configure(state='disabled')
+
         def close_me():
             dialog.destroy()
 
         def select_problem():
             nonlocal domain_file, inst_file, viz, problem
+            if instance_only:
+                if confirm_discard('instance'):
+                    path = RDDLRepoManager().get_problem(problem).get_instance(
+                        instance_var.get())
+                    _pane_from_file(inst_pane, inst_editor, 'Instance', path)
+                    inst_file = None  # not saved over the file in rddlrepository
+                    close_me()
+                return
             if not confirm_discard('domain', 'instance'):
                 return
             domain, instance = domain_var.get(), instance_var.get()
@@ -862,6 +890,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     inst_menu_file_drop = MenuBarMenu(inst_menu_file)
     inst_menu_file_drop.add_option('New Instance', create_instance, NEW)
     inst_menu_file_drop.add_separator()
+    inst_menu_file_drop.add_option('Load Instance from rddlrepository...',
+                                   lambda: open_from_dialog(instance_only=True))
     inst_menu_file_drop.add_option('Load Instance from File...', open_instance, OPEN)
     inst_menu_file_drop.add_separator()
     inst_menu_file_drop.add_option('Save Instance', save_instance, SAVE)
@@ -912,6 +942,18 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     view_menu_drop.add_option('Toggle Word Wrap', toggle_word_wrap, WRAP)
     view_menu_drop.add_option('Toggle Light/Dark Theme', toggle_theme)
 
+    # help menu: pages on the web
+    def open_docs():
+        webbrowser.open(DOCS_URL)
+
+    def report_bug():
+        webbrowser.open(ISSUES_URL)
+
+    help_menu = menu.add_cascade("Help")
+    help_menu_drop = MenuBarMenu(help_menu)
+    help_menu_drop.add_option('pyRDDLGym Documentation', open_docs)
+    help_menu_drop.add_option('Report a Bug', report_bug)
+
     # buttons: on the right of the menu bar, in groups, and of the header of each pane
     menu.grid_columnconfigure(menu.num, weight=1)
     menu_buttons = (
@@ -923,6 +965,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
          ('goto', f'Go to line ({GOTO})', go_to_line)),
         (('wrap', f'Toggle word wrap ({WRAP})', toggle_word_wrap),
          ('moon', 'Toggle light/dark theme', toggle_theme)),
+        (('docs', 'pyRDDLGym documentation', open_docs),
+         ('bug', 'Report a bug', report_bug)),
     )
     column = menu.num + 1
     for (g, group) in enumerate(menu_buttons):
@@ -946,10 +990,14 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
                 (f'New {noun} ({NEW})', f'Load {noun} from file ({OPEN})',
                  f'Save {noun} ({SAVE})', f'Save {noun} as ({SAVE_AS})'), commands):
             header.add_button(icon, tooltip, command)
-            if header is domain_pane.header and icon == 'load':
+            if icon == 'load' and header is domain_pane.header:
                 header.add_button(
                     'repository', 'Load domain and instance from rddlrepository',
                     open_from_dialog)
+            elif icon == 'load':
+                header.add_button(
+                    'repository', 'Load another instance of the domain from rddlrepository',
+                    lambda: open_from_dialog(instance_only=True))
     domain_pane.header.add_gap()
     domain_pane.header.add_button(
         'check', f'Check domain and instance ({CHECK})', check_problem)
