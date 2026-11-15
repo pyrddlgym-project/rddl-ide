@@ -5,6 +5,7 @@ from pygments import token
 from pygments.styles import get_style_by_name
 import re
 
+from rddl_ide.core import touch
 from rddl_ide.core.textfile import FileFormat
 
 PYTHON_GRAMMAR = [
@@ -286,7 +287,8 @@ class CodeEditor:
         
         text_area.gutter = LineNumbers(window, text_area)
         text_area.gutter.pack(side='left', fill='y')
-        text_area.pack(expand=True, fill='both')        
+        text_area.pack(expand=True, fill='both')
         CTkScrollbar(window, command=text_area.xview)
         CTkScrollbar(window, command=text_area.yview)
+        touch.drag_to_scroll(text_area._textbox)
         

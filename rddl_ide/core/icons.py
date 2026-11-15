@@ -252,6 +252,12 @@ def _summary(pen):
         pen.line((x, 20), (x, top))
 
 
+def _tablet(pen):
+    '''A tablet: a rounded frame with a dot for the home button.'''
+    pen.line((5, 2.5), (19, 2.5), (19, 21.5), (5, 21.5), closed=True, radius=2.5)
+    pen.circle((12, 18), 1.1, fill=True)
+
+
 def _options(pen):
     '''Three sliders.'''
     for (y, knob) in ((5.5, 15), (12, 8), (18.5, 13)):
@@ -350,7 +356,7 @@ DRAWINGS = {'new': _new, 'load': _load, 'repository': _repository, 'save': _save
             'copy': _copy, 'paste': _paste, 'find': _find, 'replace': _replace,
             'goto': _goto, 'check': _check, 'up': _up, 'down': _down, 'close': _close,
             'wrap': _wrap, 'moon': _moon, 'sun': _sun, 'graph': _graph,
-            'summary': _summary,
+            'summary': _summary, 'tablet': _tablet,
             'options': _options, 'refresh': _refresh, 'restart': _restart,
             'step': _step, 'run_to_end': _run_to_end, 'more': _more, 'bug': _bug,
             'docs': _docs}

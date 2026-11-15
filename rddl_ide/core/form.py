@@ -8,6 +8,7 @@ from customtkinter import (
     CTkButton, CTkCheckBox, CTkFont, CTkScrollableFrame, ThemeManager
 )
 
+from rddl_ide.core import touch
 from rddl_ide.core.codearea import monospace_family
 from rddl_ide.core.popup import ChoiceMenu
 from rddl_ide.core.settings.model import format_value, is_changed, parse_value
@@ -60,6 +61,7 @@ class SettingsForm(CTkScrollableFrame):
         self.family = monospace_family()
         self.columnconfigure(0, weight=1)
         self.render()
+        touch.on_change(self.render)
 
     def _mouse_wheel_all(self, event):
         if not sys.platform.startswith('win') or self._shift_pressed or \
@@ -94,7 +96,7 @@ class SettingsForm(CTkScrollableFrame):
         # the value fields blend with the form
         self.entry_style = dict(
             bg=self.background, insertbackground=palette['text'], relief='flat',
-            bd=self._scaled(3), highlightthickness=1, highlightbackground=self.background,
+            bd=self._scaled(touch.size(3, 9)), highlightthickness=1, highlightbackground=self.background,
             highlightcolor=palette['accent'])
         self.hover_border = palette['field_border']
         self.entry_colors = (palette['text'], palette['text_muted'])

@@ -10,6 +10,7 @@ from customtkinter import (
 from customtkinter import get_appearance_mode, set_appearance_mode
 from customtkinter import filedialog as fd
 
+from rddl_ide.core import touch
 from rddl_ide.core.checking import check, summarize
 from rddl_ide.core.dialog import Dialog
 from rddl_ide.core.findbar import FindBar
@@ -880,6 +881,15 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
         wrap_button.configure(fg_color=ThemeManager.theme['Palette']['hover']
                               if word_wrap else 'transparent')
 
+    touch.install(root)
+
+    def toggle_tablet_mode():
+        '''Makes buttons, fields, menus and scrollbars larger for a finger, and dragging
+        an editor scroll it, or not; the button stays shaded while it is on.'''
+        touch.toggle(root)
+        tablet_button.configure(fg_color=ThemeManager.theme['Palette']['hover']
+                                if touch.enabled else 'transparent')
+
     # keyboard SHORTCUTS: those of files act on the pane in use (e.g. Ctrl+S saves the
     # domain while editing it); undo, redo, cut, copy and paste are Tk's own
     shortcuts = Shortcuts(root)
@@ -993,6 +1003,7 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
     view_menu_drop = MenuBarMenu(view_menu)
     view_menu_drop.add_option('Toggle Word Wrap', toggle_word_wrap, WRAP)
     view_menu_drop.add_option('Toggle Light/Dark Theme', toggle_theme)
+    view_menu_drop.add_option('Toggle Tablet Mode', toggle_tablet_mode)
 
     # help menu: pages on the web
     def open_docs():
@@ -1016,7 +1027,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
          ('replace', f'Replace ({REPLACE})', find_and_replace),
          ('goto', f'Go to line ({GOTO})', go_to_line)),
         (('wrap', f'Toggle word wrap ({WRAP})', toggle_word_wrap),
-         ('moon', 'Toggle light/dark theme', toggle_theme)),
+         ('moon', 'Toggle light/dark theme', toggle_theme),
+         ('tablet', 'Toggle tablet mode', toggle_tablet_mode)),
         (('docs', 'pyRDDLGym documentation', open_docs),
          ('bug', 'Report a bug', report_bug)),
     )
@@ -1031,6 +1043,8 @@ def assign_menubar_functions(menu, root, domain_pane, inst_pane, policy_pane,
             column += 1
             if icon == 'wrap':
                 wrap_button = button
+            elif icon == 'tablet':
+                tablet_button = button
 
     for (header, noun, commands) in (
             (domain_pane.header, 'domain',

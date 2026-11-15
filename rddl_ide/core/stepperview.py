@@ -11,6 +11,7 @@ from customtkinter import (
     CTkToplevel, ScalingTracker, ThemeManager
 )
 
+from rddl_ide.core import touch
 from rddl_ide.core.appicon import set_icon
 from rddl_ide.core.errorlocation import strip_ansi
 from rddl_ide.core.graphview import _mix
@@ -131,6 +132,7 @@ class StepperWindow(CTkToplevel):
         self.bind('<Destroy>', lambda e: e.widget is self and self._closed(), add='+')
         AppearanceModeTracker.add(self._recolor, self)
         self._style()
+        touch.on_change(self._style)
         self._place()
         self._update_buttons()
         self.after(10, self.restart)
@@ -340,7 +342,8 @@ class StepperWindow(CTkToplevel):
             ('content', 'text', 'text_muted', 'accent', 'chrome', 'border'))
         style.configure(STYLE, background=background, fieldbackground=background,
                         foreground=text, font=(family, size), borderwidth=0,
-                        rowheight=round(ROW_HEIGHT * scale), indent=round(16 * scale))
+                        rowheight=round(touch.size(ROW_HEIGHT, touch.TARGET) * scale),
+                        indent=round(16 * scale))
         style.layout(STYLE, [('Treeview.treearea', {'sticky': 'nswe'})])
         style.map(STYLE, background=[('selected', _mix(accent, background, 0.3))],
                   foreground=[('selected', text)])

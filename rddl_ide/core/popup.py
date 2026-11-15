@@ -8,6 +8,8 @@ from typing import Callable, Collection, List, Optional, Tuple, Union
 
 from customtkinter import CTkFont, CTkOptionMenu, ThemeManager, get_appearance_mode
 
+from rddl_ide.core import touch
+
 SEPARATOR = None
 Item = Union[Tuple[str, Callable[[], None]], Tuple[str, Callable[[], None], str], None]
 
@@ -21,6 +23,7 @@ RIGHT_INSET = 28
 SHORTCUT_GAP = 40
 FONT_SIZE = 14
 SCROLLBAR_WIDTH = 6
+MENU_BAR_TOUCH_SPACING = 12  # around the title of a menu of the menu bar
 SCREEN_MARGIN = 8
 TYPEAHEAD_PAUSE = 1000
 
@@ -78,7 +81,7 @@ class PopupMenu:
         scale = anchor._get_widget_scaling() if hasattr(anchor, '_get_widget_scaling') \
             else 1.0
         s = lambda value: max(1, round(value * scale))
-        self.row_height = s(ROW_HEIGHT)
+        self.row_height = s(touch.size(ROW_HEIGHT, touch.TARGET))
 
         self.font = tkfont.Font(family=CTkFont().cget('family'), size=-s(FONT_SIZE))
         checkable = selected is not None
@@ -92,8 +95,8 @@ class PopupMenu:
                 separators.append(y + s(SEPARATOR_HEIGHT) // 2)
                 y += s(SEPARATOR_HEIGHT)
             else:
-                self.rows.append((y, y + s(ROW_HEIGHT), i))
-                y += s(ROW_HEIGHT)
+                self.rows.append((y, y + self.row_height, i))
+                y += self.row_height
         total = y + pad
 
         # the height
@@ -108,7 +111,8 @@ class PopupMenu:
             total = room
         height = min(total, room)
         self.scrollable = total > height
-        self.scrollbar_width = s(SCROLLBAR_WIDTH) if self.scrollable else 0
+        self.scrollbar_width = s(touch.size(SCROLLBAR_WIDTH, touch.SCROLLBAR // 2)) \
+            if self.scrollable else 0
 
         labels = [item[0] for item in items if item is not SEPARATOR]
         shortcuts = [_shortcut(item) for item in items if item is not SEPARATOR]
@@ -413,6 +417,9 @@ class MenuBarMenu:
                          hover_color=ThemeManager.theme['Palette']['hover'],
                          text_color=ThemeManager.theme['Palette']['text'])
         MenuBarMenu._menus.append(self)
+        spacing = widget.cget('border_spacing')
+        touch.on_change(lambda: widget.configure(
+            border_spacing=touch.size(spacing, MENU_BAR_TOUCH_SPACING)))
 
     def add_option(self, option: str, command: Callable[[], None], 
                    shortcut: Optional[str]=None) -> None:

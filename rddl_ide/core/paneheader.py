@@ -5,6 +5,7 @@ from typing import Callable, List, Tuple
 
 from customtkinter import CTkButton, CTkFont, CTkFrame, CTkLabel, ThemeManager
 
+from rddl_ide.core import touch
 from rddl_ide.core.icons import IconButton, Tooltip
 from rddl_ide.core.popup import SEPARATOR, PopupMenu
 
@@ -50,6 +51,7 @@ class PaneHeader(CTkFrame):
         self._hidden = 0
         self.more = IconButton(self.tools, 'more', 'More actions', self._open_more)
         self.bind('<Configure>', self._schedule_fit, add='+')
+        touch.on_change(self._schedule_fit)
 
     def set_active(self, active: bool) -> None:
         '''Underlines the header in the accent color while its pane is the one the
